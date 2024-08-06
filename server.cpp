@@ -32,3 +32,22 @@ int parseArguments(int argc, char* argv[], uint16_t& port, std::string& file, in
     }
     return 0;
 }
+
+class Server{
+    public:
+        Server(uint16_t port, const std::string& file, int timeout)
+        : port(port), file(file), timeout(timeout), cardSet()
+        {
+            std::cout << "Instancja serwera została stworzona\n";
+        }
+
+        ~Server(){
+            std::cout << "Instancja serwera została zniszczona\n";
+        }
+
+    private:
+        uint16_t port;
+        std::string file;
+        int timeout;
+        std::vector<Card> cardSet;
+};

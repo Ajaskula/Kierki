@@ -2,6 +2,7 @@
 #define KLIENT_H
 
 #include <string>
+#include "common.h"
 
 int parseArguments(int argc, char *argv[], std::string& host, uint16_t& port, bool& IPv4, bool& IPv6, char& position, bool& isBot);
 
