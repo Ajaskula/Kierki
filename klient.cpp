@@ -1,7 +1,9 @@
 #include <iostream>
 #include <string>
 #include "klient.h"
+#include "common.h"
 
+// metoda nie związana z klasą klienta
 int parseArguments(int argc, char *argv[], std::string& host, uint16_t& port, bool& IPv4, bool& IPv6, char& position, bool& isBot){
     for(int i = 0; i < argc; i++){
         std::string arg = argv[i];
@@ -47,3 +49,24 @@ int parseArguments(int argc, char *argv[], std::string& host, uint16_t& port, bo
     }
     return 0;
 }
+
+Klient::Klient(const std::string& host, uint16_t port, bool IPv4, bool IPv6,
+        char position, bool isBot)
+        : host(host), port(port), IPv4(IPv4), IPv6(IPv6), position(position), isBot(isBot), cardSet(), points(0)
+        {
+            std::cout << "Instancja klienta została stworzona\n";
+        }
+Klient::~Klient(){
+            std::cout << "Instancja klienta została zniszczona\n";
+        }
+void Klient::run(){
+            if(connect()){
+                std::cerr << "Nie udało się połączyć z serwerem\n";
+            }
+        }
+bool Klient::connect(){
+            std::cout << "Próba połączenia z serwerem " << host << " na porcie " << port << "\n";
+            return false;
+        }
+
+

@@ -25,7 +25,8 @@ class Klient{
         bool IPv6;
         char position;
         bool isBot;
-        std::set<Card> cardSet;
+        std::CardSet cardSet;
+        int points;
 
         // metoday klienta
         bool connect();

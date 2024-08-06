@@ -13,10 +13,13 @@ class Server{
         // destruktor
         ~Server();
 
+        // uruchamia serwer
+        void run();
+
     private:
         uint16_t port;
         std::string file;
         int timeout;
-        std::vector<Card> cardSet;
+        std::CardSet cardSet;
 }
 #endif // SERVER_H

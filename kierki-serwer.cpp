@@ -12,6 +12,11 @@ int main(int argc, char *argv[]){
         return 1;
     }
 
+    // inicjalizacja instancji serwera
+    Server server(port, file, timeout);
+
+    server.run();
+
 
 
 
