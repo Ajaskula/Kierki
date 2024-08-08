@@ -79,9 +79,59 @@ int run(){
     std::cout << "Połączenie nawiązane\n";
 
     // logika działania klienta
+    std::string message = "IAMX\r\n";
+    message[3] = position;
+
+    // długość wiadomości bez terminalnego zera
+    size_t length = message.length();
+
+    // wysyłanie wiadomości do serwera
+    ssize_t bytes_sent = send(socket_fd, message.c_str(), length, 0);
+    // jeśli nie udało się wysłać wiadomości do serwera
+    if(bytes_sent == -1){
+        std::cerr << "Błąd podczas wysyłania wiadomości\n";
+        close(socket_fd);
+        return -1;
+    }
+
+    // czekam na odpowiedź od serwera
 
     // zamykanie połączenie
     close(socket_fd);
+}
+
+void send_message(int socket_fd, const std::string &message){
+    size_t length = message.length();
+    ssize_t bytes_sent = send(socket_fd, message.c_str(), length, 0);
+    if(bytes_sent == -1){
+        std::cerr << "Błąd podczas wysyłania wiadomości\n";
+        close(socket_fd);
+        exit(1);
+    }
+    std::cout << "Wysłano wiadomość: " << message << "\n";
+}
+
+// funkcja pozwala na odbieranie wiadomości od serwera
+int receive_message(int socket_fd){
+    const size_t buffer_size = 1024;
+    char buffer[buffer_size];
+
+    ssize_t bytes_received = recv(socket_fd, buffer, buffer_size - 1, 0);
+    if(bytes_received == -1){
+        std::cerr << "Błąd podczas odbierania wiadomości\n";
+        close(socket_fd);
+        exit(1);
+    } else if (bytes_received == 0){
+        std::cerr << "Serwer zamknął połączenie\n";
+        close(socket_fd);
+        return;
+    }
+
+    buffer[bytes_received] = '\0';
+    std::cout << "Otrzymano wiadomość: " << buffer << "\n";
+
+    // logika w zależności od tego jaka wiadomość została przysłana od serwera
+    
 }
 
 // funkcja nawiązująca połączenie przez klienta

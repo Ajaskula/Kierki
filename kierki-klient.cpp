@@ -22,10 +22,6 @@ int main(int argc, char *argv[]){
     // uruchamiam klienta
     klient.run();
 
-    
-
-
-
 
 
     return 0;
