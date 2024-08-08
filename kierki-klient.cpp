@@ -22,7 +22,7 @@ int main(int argc, char *argv[]){
     // uruchamiam klienta
     klient.run();
 
-    // ewentualna jakaś obsługa błędów
+    
 
 
 

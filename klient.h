@@ -14,7 +14,7 @@ class Klient{
         // destruktor klienta
         ~Klient();
         // metoda uruchamiająca klienta
-        void run();
+        int run();
 
     private:
 
@@ -29,7 +29,7 @@ class Klient{
         int points;
 
         // metoday klienta
-        bool connect();
+        int connect();
 }
 
 #endif // KLIENT_H
