@@ -82,7 +82,6 @@ int Klient::run(){
     // w tym miejscu klient czeka na odpowiedź od serwera
     // możliwe odpowiedzi to:
     // - busy i zakończenie połączenia, jeśli miejsce przy stole jest zajęte
-    // zamknięcie połączenia, jeśli serwer uznał, że wiadomość od klienta była błędna
     // Deal i rozpoczęcie rozgrywki
     // wszystkie inne rzeczy są ignorowane
 
@@ -113,7 +112,54 @@ int Klient::run(){
     // dopóki w buforze nie znajdę braku dopasowania
     while((pos = accumulated_data.find("\r\n")) != std::string::npos){
 
-        message = 
+        message = accumulatedData.substr(0, pos);
+        accumulated_data.erase(0, pos + 2);
+
+        // przetwórz wiadomość
+
+        // jeśli wiadomość to "busy"
+        if(message.substr(0, 4) == "BUSY"){
+            std::cout << "Miejsce przy stole jest zajęte\n";
+
+            // możliwe przyczyny niepoprawności tego rodzaju komunikatu
+            // muszę jeszcze sprawdzić poprawność otrzymanej wiadomości
+            if(message.length() > 8){
+                // niepoprawna wiadomość
+            }
+            // jeśli w 
+            bool my_position = false;
+
+            // sprawdzam czy w wiadomości znajduje się mój znak i czy znajdują się tylko poprawne znaki
+            for(int i = 4; i < message.length(); i++){
+                if(message[i] != 'N' && message[i] != 'S' && message[i] != 'E' && message[i] != 'W'){
+                    // niepoprawna wiadomość
+                }
+                if(message[i] == position){
+                    my_position = true;
+                }
+
+            }
+            if(my_position == false){
+                // niepoprawna wiadomość
+            }
+
+
+            close(socket_fd);
+            return -1;
+
+        // jeśli wiadomość to "Deal"
+        }else if(message.substr(0, 4) == "DEAL"){
+            std::cout << "Rozpoczęcie rozgrywki\n";
+
+            // tutaj powinienem otrzymać 13 kart
+            break;
+        
+        // inne wiadomości są ignorowane jako niepopranwe
+        }else{
+
+        }
+
+
     }
 
 
