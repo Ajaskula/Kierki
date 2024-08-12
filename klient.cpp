@@ -59,18 +59,13 @@ Klient::Klient(const std::string& host, uint16_t port, bool IPv4, bool IPv6,
 Klient::~Klient(){
             std::cout << "Instancja klienta została zniszczona\n";
         }
-void Klient::run(){
-            if(connect()){
-                std::cerr << "Nie udało się połączyć z serwerem\n";
-            }
-        }
-bool Klient::connect(){
-            std::cout << "Próba połączenia z serwerem " << host << " na porcie " << port << "\n";
-            return false;
-        }
 
-int run(){
-    int socket_fd = connect();
+int Klient::run(){
+
+    // nawiązanie połączenia
+    int socket_fd = connect_to_server();
+
+    // jeśli nie udąło się nawiązać połączenia
     if(socket_fd == -1){
         std::cerr << "Nie udało się nawiązać połączenia\n";
         return -1;
@@ -78,64 +73,110 @@ int run(){
 
     std::cout << "Połączenie nawiązane\n";
 
-    // logika działania klienta
-    std::string message = "IAMX\r\n";
-    message[3] = position;
+    // wyślij wiadomość powitalną do serwera
+    std::string message = "IAM" + position + "\r\n";
 
-    // długość wiadomości bez terminalnego zera
-    size_t length = message.length();
+    // wysłanie wiadmości powitalnej do serwera
+    send_message(socket_fd, message);
 
-    // wysyłanie wiadomości do serwera
-    ssize_t bytes_sent = send(socket_fd, message.c_str(), length, 0);
-    // jeśli nie udało się wysłać wiadomości do serwera
-    if(bytes_sent == -1){
-        std::cerr << "Błąd podczas wysyłania wiadomości\n";
-        close(socket_fd);
-        return -1;
-    }
+    // w tym miejscu klient czeka na odpowiedź od serwera
+    // możliwe odpowiedzi to:
+    // - busy i zakończenie połączenia, jeśli miejsce przy stole jest zajęte
+    // zamknięcie połączenia, jeśli serwer uznał, że wiadomość od klienta była błędna
+    // Deal i rozpoczęcie rozgrywki
+    // wszystkie inne rzeczy są ignorowane
 
-    // czekam na odpowiedź od serwera
-
-    // zamykanie połączenie
-    close(socket_fd);
-}
-
-void send_message(int socket_fd, const std::string &message){
-    size_t length = message.length();
-    ssize_t bytes_sent = send(socket_fd, message.c_str(), length, 0);
-    if(bytes_sent == -1){
-        std::cerr << "Błąd podczas wysyłania wiadomości\n";
-        close(socket_fd);
-        exit(1);
-    }
-    std::cout << "Wysłano wiadomość: " << message << "\n";
-}
-
-// funkcja pozwala na odbieranie wiadomości od serwera
-int receive_message(int socket_fd){
     const size_t buffer_size = 1024;
     char buffer[buffer_size];
 
     ssize_t bytes_received = recv(socket_fd, buffer, buffer_size - 1, 0);
+
+    // jeśli wystąpił błąd podczas 
+    if(bytes_received == -1){
+        std::cerr << "Błąd podczas odbierania wiadomości\n";
+        close(socket_fd);
+        return -1;
+    }else if(bytes_received == 0){
+        std::cerr << "Serwer zamknął połączenie\n";
+        close(socket_fd);
+        return -1;
+    }
+
+    buffer[bytes_received] = '\0';
+    std::cout << "Otrzymano wiadomość: " << buffer << "\n";
+
+    // otrzymałem jakąś wiadmość, teraz chcę ją przeanalizować
+
+    std::string accumulated_data;
+    size_t pos = 0;
+
+    // dopóki w buforze nie znajdę braku dopasowania
+    while((pos = accumulated_data.find("\r\n")) != std::string::npos){
+
+        message = 
+    }
+
+
+    // odpowiadanie na komunikaty typu trick
+
+
+
+}
+
+// funkcja pozwala na wysyłanie wiadomości do serwera
+// podaje deskryptor gniazda, na który ma zostać wysłana wiadomość
+// przekazanie stringa przez stałą referencję, const informuje, że funkcja nie zmieni wartości stringa
+void Klient::send_message(int socket_fd, const std::string &message){
+    // odczytuje długość stringa
+    size_t length = message.length();
+    // wysyłam wiadomość do serwera na podstawie deskryptora gniazda, nie przekazuje żandych flag
+    // metoda .c_str() zwraca wskaźnik na tablicę znaków, która jest przechowywana w stringu
+    ssize_t bytes_sent = send(socket_fd, message.c_str(), length, 0);
+
+    // jeśli nie udało się wysłać wiadomości do serwera
+    if(bytes_sent == -1){
+        std::cerr << "Błąd podczas wysyłania wiadomości\n";
+        close(socket_fd);
+        exit(1);
+    }
+    // pomyślnie wysłano wiadomość do serwera
+    std::cout << "Wysłano wiadomość: " << message << "\n";
+}
+
+// funkcja pozwala na odbieranie wiadomości od serwera
+int Klient::receive_message(int socket_fd){
+
+    // rozmiar bufora
+    const size_t buffer_size = 1024;
+    // tablica znaków, w której zostanie zapisana wiadomość
+    char buffer[buffer_size];
+
+    // odbieranie wiadomości od serwera
+    // zwraca liczbę otrzymanych bajtów
+    // buffer - wskaźnik na tablicę znaków, w której zostanie zapisana wiadomość
+    // odejumjemu 1 od rozmiaru bufora, żeby zostawić miejsce na terminalne zero
+    ssize_t bytes_received = recv(socket_fd, buffer, buffer_size - 1, 0);
+
+    // nie udąło się załadować wiadomości
     if(bytes_received == -1){
         std::cerr << "Błąd podczas odbierania wiadomości\n";
         close(socket_fd);
         exit(1);
+    
+    // serwer zamknął połączenie
     } else if (bytes_received == 0){
         std::cerr << "Serwer zamknął połączenie\n";
         close(socket_fd);
         return;
     }
 
+    // dodajemy terminalne zero na końcu otrzymanej wiadomości
     buffer[bytes_received] = '\0';
     std::cout << "Otrzymano wiadomość: " << buffer << "\n";
-
-    // logika w zależności od tego jaka wiadomość została przysłana od serwera
-    
 }
 
 // funkcja nawiązująca połączenie przez klienta
-int Klient::connect(){
+int Klient::connect_to_server(){
             std::cout << "Próba połączenia z serwerem " << host << " na porcie " << port << "\n";
 
             // hints jest zmienną lokalną, która służy do przekazywania informacji o tym, jakiego typu adresy chcemy uzyskać
@@ -161,8 +202,10 @@ int Klient::connect(){
 
             // tworzenie socketu i próba połączenia
             int socket_fd;
+            // iteruje poprzez wszystkie adresy zwrócone przez getaddrinfo
             for(struct addrinfo *p = res; p != NULL; p = p->ai_next){
-
+                
+                // próba utowrzenia socketu
                 socket_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
                 if(socket_fd == -1){
                     continue;
@@ -177,6 +220,7 @@ int Klient::connect(){
                 return socket_fd;
             }
             
+            // zwolni całą listę uzyskanych adresów na raz
             freeaddrinfo(res);
             return -1;
 }

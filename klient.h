@@ -29,7 +29,7 @@ class Klient{
         int points;
 
         // metoday klienta
-        int connect();
+        int connect_to_server();
 }
 
 #endif // KLIENT_H
