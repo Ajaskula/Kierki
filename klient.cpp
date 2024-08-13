@@ -60,6 +60,36 @@ Klient::~Klient(){
             std::cout << "Instancja klienta została zniszczona\n";
         }
 
+// sprawdza poprawność wiadomości BUSY
+bool Klient::validate_BUSY(const std::string& message){
+    // poprawna wiadomość BUSY może mieć maksymalnie 8 znaków
+    if(message.length() > 8){
+        return false;
+    }
+    // poprawna wiadomość BUSY może zawierać tylko znaki N, S, E, W
+    for(int i = 4; i < message.length(); i++){
+        if(message[i] != 'N' && message[i] != 'S' && message[i] != 'E' && message[i] != 'W'){
+            return false;
+        }
+    }
+    // poprawna wiadomość BUSY musi zawierać znak gracza, który próbuje dołączyć
+    if(message.substr(4).find(position) == std::string::npos){
+        return false;
+    }
+    // każdy ze znaków N, S , E, W może wystąpić tylko raz
+    for(int i = 4; i < message.length(); i++){
+        // metoda rfind zwraca pierwsze występienia znaku od końca
+        if(message.substr(4).find(message[i]) != message.substr(4).rfind(message[i])){
+            return false;
+        }
+    }
+    return true;
+
+}
+bool Klient::validate_DEAL(){
+
+}
+
 int Klient::run(){
 
     // nawiązanie połączenia
@@ -75,38 +105,122 @@ int Klient::run(){
 
     // wyślij wiadomość powitalną do serwera
     std::string message = "IAM" + position + "\r\n";
-
-    // wysłanie wiadmości powitalnej do serwera
     send_message(socket_fd, message);
 
     // w tym miejscu klient czeka na odpowiedź od serwera
     // możliwe odpowiedzi to:
     // - busy i zakończenie połączenia, jeśli miejsce przy stole jest zajęte
     // Deal i rozpoczęcie rozgrywki
-    // wszystkie inne rzeczy są ignorowane
+    // wszystkie inne rzeczy są ignorowane (niepoprawne odpowiedzi serwera)
+
+    // odbieranie wiadomości od serwera, wiadomość znajdzie się we wskazanym buforze
 
     const size_t buffer_size = 1024;
-    char buffer[buffer_size];
+    char buffer[buffer_size] = {0};
+    ssize_t bytes_received = 0;
+    for(;;){
+        bool incorrect_message = false;
+        // odbieram wiadomość
+        bytes_received = recv(socket_fd, buffer, buffer_size - 1, 0);
 
-    ssize_t bytes_received = recv(socket_fd, buffer, buffer_size - 1, 0);
+        // wystąpił błąd, lub serwer zamknął połączenie
+        if(bytes_received == -1){
+            std::cerr << "Błąd podczas odbierania wiadomości\n";
+            close(socket_fd);
+            return -1;
+        }else if(bytes_received == 0){
+            std::cerr << "Serwer zamknął połączenie\n";
+            close(socket_fd);
+            return -1;
+        }
 
-    // jeśli wystąpił błąd podczas 
-    if(bytes_received == -1){
-        std::cerr << "Błąd podczas odbierania wiadomości\n";
-        close(socket_fd);
-        return -1;
-    }else if(bytes_received == 0){
-        std::cerr << "Serwer zamknął połączenie\n";
-        close(socket_fd);
-        return -1;
+        std::cout << "Otrzymano wiadomość: " << buffer << "\n";
+
+        // szukam pierwszego wystąpienia \r\n
+        string accumulated_data(buffer, bytes_received);
+
+        size_t pos = accumulated_data.find("\r\n");
+        if(pos != std::string::npos){
+            message = accumulated_data.substr(0, pos);
+            accumulated_data.erase(0, pos + 2);
+            break;
+        }
+
+        // w message znajduje się wiadomość, gotowa do analizy
+        if(message.substr(0, 4) == "BUSY"){
+
+            // sprawdzenie poprawności wiadomości BUSY
+            // poprawna wiadomość BUSY może mieć maksymalnie 8 znaków
+            // poprawna wiadomość BUSY może zawierać tylko znaki N, S, E, W
+            // poprawna wiadomość BUSY musi zawierać znak gracza, który próbuje dołączyć
+            if(message.length() > 8){
+                cerr << "Niepoprawna wiadomość serwera\n";
+                cerr << message.c_str() << "\n";
+                incorrect_message = true;
+            
+            // jeśli na liście pozycji nie znajduje się znak gracza, który próbuje dołączyć
+            }else if(message.substr(4).find(position) == std::string::npos){
+                cerr << "Niepoprawna wiadomość serwera\n";
+                cerr << message.c_str() << "\n";
+                incorrect_message = true;
+            
+            // jeśli na liście pozycji znajduje się znak, który nie powinien tam być
+            }else{
+                // sprawdzenie czy lista zawiera tylko odpowiednie znaki
+                for(int i = 4; i < message.length(); i++){
+                    if(message[i] != 'N' && message[i] != 'S' && message[i] != 'E' && message[i] != 'W'){
+                        cerr << "Niepoprawna wiadomość serwera\n";
+                        cerr << message.c_str() << "\n";
+                        incorrect_message = true;
+                        break;
+                    }
+
+            }
+            // wiadomość busy jest poprawna, zamykam połączenie
+            if(!incorrect_message){
+                close(socket_fd);
+                return -1;
+            }
+
+        // analizuję wiadomość DEAL
+        }else if(message.substr(0, 4) == "DEAL"){
+
+            // sprawdzenie poprawności wiadomości DEAL
+            // sprawdzenie typu rozdania
+            if(message.length() < 32 || message.length() > 36){
+                cerr << "Niepoprawna wiadomość serwera\n";
+                cerr << message.c_str() << "\n";
+                incorrect_message = true;
+
+            }else if(){
+
+            }
+        
+        // inne wiadomości ignoruję jako błędne wiadomości serwera
+        }else{
+            cerr << "Niepoprawna wiadomość serwera\n";
+            cerr << message.c_str() << "\n";
+        }
+
+        // sprawdzam czy otrzymana wiadomość jest poprawna czy nie
+        if(incorrect_message){
+            cout << "Czekam na następne wiadomości\n";
+        }else{
+            break;
+        }
     }
 
-    buffer[bytes_received] = '\0';
-    std::cout << "Otrzymano wiadomość: " << buffer << "\n";
+
+    // liczba otrzymanych bajtów
+
+    // jeśli wystąpił błąd podczas 
+
+    // otrzymaliśmy wiadomość, dodajemy terminalne zero na końcu
 
     // otrzymałem jakąś wiadmość, teraz chcę ją przeanalizować
 
     std::string accumulated_data;
+    accumulated_data.append(buffer, bytes_received);
     size_t pos = 0;
 
     // dopóki w buforze nie znajdę braku dopasowania
@@ -114,8 +228,6 @@ int Klient::run(){
 
         message = accumulatedData.substr(0, pos);
         accumulated_data.erase(0, pos + 2);
-
-        // przetwórz wiadomość
 
         // jeśli wiadomość to "busy"
         if(message.substr(0, 4) == "BUSY"){
@@ -147,14 +259,14 @@ int Klient::run(){
             close(socket_fd);
             return -1;
 
-        // jeśli wiadomość to "Deal"
+        // jeśli wiadomość to "DEAL"
         }else if(message.substr(0, 4) == "DEAL"){
             std::cout << "Rozpoczęcie rozgrywki\n";
 
             // tutaj powinienem otrzymać 13 kart
             break;
         
-        // inne wiadomości są ignorowane jako niepopranwe
+        // inne wiadomości są ignorowane
         }else{
 
         }
