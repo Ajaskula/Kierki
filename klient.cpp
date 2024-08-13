@@ -62,8 +62,8 @@ Klient::~Klient(){
 
 // sprawdza poprawność wiadomości BUSY
 bool Klient::validate_BUSY(const std::string& message){
-    // poprawna wiadomość BUSY może mieć maksymalnie 8 znaków
-    if(message.length() > 8){
+    // poprawna wiadomość BUSY może mieć maksymalnie 8 znaków i minimalnie 5
+    if(message.length() > 8 || message.length() < 5){
         return false;
     }
     // poprawna wiadomość BUSY może zawierać tylko znaki N, S, E, W
@@ -86,7 +86,36 @@ bool Klient::validate_BUSY(const std::string& message){
     return true;
 
 }
-bool Klient::validate_DEAL(){
+
+// sprawdzam w ten sposób, czy karta jest poprawna
+// korzystjąc z wyrażeń regularnych sprawdzam poprawność karty
+bool is_valid_card(const std::string& card){
+    static const std::regex card_regex("^(10|[2-9]|[JQKA])[CDHS]$");
+    return std::regex_match(card, card_regex);
+}
+
+// sprawdzam poprawność wiadomości DEAL
+bool Klient::validate_DEAL(const std::string& message){
+    
+    // zła długość wiadomości
+    if(message.length() < 32 || message.length() > 36){
+        return false;
+    }
+    // sprawdzenie typu rozdania
+    if(atoi(message[4]) < 1 || atoi(message[4]) > 7){
+        return false;
+    }
+
+    // sprawdzenie pozycji klienta wychodzącego jako pierwszy
+    if(message[5] != 'N' && message[5] != 'S' && message[5] != 'E' && message[5] != 'W'){
+        return false;
+    }
+
+    // sprawdzenie czy lista kart jest poprawna
+    int card_counter = 0;
+    for(){
+
+    }
 
 }
 

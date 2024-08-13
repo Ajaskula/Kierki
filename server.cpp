@@ -44,3 +44,16 @@ Server::Server(uint16_t port, const std::string& file, int timeout)
 Server::~Server(){
             std::cout << "Instancja serwera została zniszczona\n";
         }
+
+// funkcja sprawdzająca poprawność wiadomości IAM
+bool Server::validate_IAM(const std::string& message){
+
+    if(message.length() != 4){
+        return false;
+    }
+    if(message[3] != 'N' && message[3] != 'S' && message[3] != 'W' && message[3] != 'E'){
+        return false;
+    }
+
+    return true;
+}

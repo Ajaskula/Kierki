@@ -30,6 +30,7 @@ class Klient{
 
         // metoday klienta
         int connect_to_server();
+        bool is_valid_card(const std::string& card);
 }
 
 #endif // KLIENT_H
