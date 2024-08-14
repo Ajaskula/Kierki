@@ -7,6 +7,8 @@ Card::Card(char color, Rank rank) : color(color), rank(rank) {
 Card::~Card(){
     std::cout << "Instancja karty została zniszczona\n";
 }
+
+// konwersja wartości karty na string
 std::string Card::rankToString(Rank rank) const {
     switch(rank){
         case Rank::Two:
@@ -39,18 +41,37 @@ std::string Card::rankToString(Rank rank) const {
             return "Unknown";
     }
 }
-std::string Card::colorToString(Color color) const {
-    switch(color){
-        case Color::Heart:
-            return "Heart";
-        case Color::Diamond:
-            return "Diamond";
-        case Color::Club:
-            return "Club";
-        case Color::Spade:
-            return "Spade";
-        default:
-            return "Unknown";
+
+// zamienia podany string na wartość typu rank
+std::string_to_rank(const std::string& rank) const {
+    if(rank == "2"){
+        return Rank::Two;
+    }else if(rank == "3"){
+        return Rank::Three;
+    }else if(rank == "4"){
+        return Rank::Four;
+    }else if(rank == "5"){
+        return Rank::Five;
+    }else if(rank == "6"){
+        return Rank::Six;
+    }else if(rank == "7"){
+        return Rank::Seven;
+    }else if(rank == "8"){
+        return Rank::Eight;
+    }else if(rank == "9"){
+        return Rank::Nine;
+    }else if(rank == "10"){
+        return Rank::Ten;
+    }else if(rank == "J"){
+        return Rank::Jack;
+    }else if(rank == "Q"){
+        return Rank::Queen;
+    }else if(rank == "K"){
+        return Rank::King;
+    }else if(rank == "A"){
+        return Rank::Ace;
+    }else{
+        return Rank::Unknown;
     }
 }
 
@@ -86,6 +107,13 @@ void CardSet::initializeFullDeck(){
 // dodaje kartę do zbioru kart
 void CardSet::addCard(Card card){
     cards.push_back(card);
+}
+
+void addCards(const std::string& cards){
+    for(int i = 0; i < cards.length(); i+=2){
+        Card card(static_cast<Card::Color>(cards[i]), static_cast<Card::Rank>(cards[i+1]));
+        addCard(card);
+    }
 }
 
 // usuwa kartę z talii

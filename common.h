@@ -36,6 +36,7 @@ class CardSet{
         ~CardSet();
         // metoda dodająca kartę do talii
         void addCard(Card card);
+        void addCards(const std::string& cards);
         // metoda usuwająca kartę z talii
         void removeCard(Card card);
         // metoda zwracająca kartę z talii

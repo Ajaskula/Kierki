@@ -84,14 +84,54 @@ bool Klient::validate_BUSY(const std::string& message){
         }
     }
     return true;
-
 }
-
 // sprawdzam w ten sposób, czy karta jest poprawna
 // korzystjąc z wyrażeń regularnych sprawdzam poprawność karty
 bool is_valid_card(const std::string& card){
     static const std::regex card_regex("^(10|[2-9]|[JQKA])[CDHS]$");
     return std::regex_match(card, card_regex);
+}
+
+// sprawdzam czy otrzymane karty są poprawne
+bool is_valid_hand(const std::string& hand) {
+    // zbiór do przechowywanie unikalnych kart
+    std::set<std::string> unique_cards; // Zbiór do przechowywania unikalnych kart
+
+    // przetwarzanie karty po karcie
+    size_t i = 0;
+    size_t hand_length = hand.length();
+    int card_count = 0;
+
+    // dopóki nie przejdę przez cały string
+    while (i < hand_length) {
+        std::string card;
+
+        if (i + 2 < hand_length && hand.substr(i, 2) == "10") {
+            card = hand.substr(i, 3); // Karta to "10X"
+            i += 3;
+        } else if (i + 1 < hand_length) {
+            card = hand.substr(i, 2); // Karta to "VX"
+            i += 2;
+        } else {
+            return false; // Niekompletna karta na końcu stringa
+        }
+
+        if (!is_valid_card(card)) {
+            return false; // Znaleziono niepoprawną kartę
+        }
+
+        if (!unique_cards.insert(card).second) {
+            return false; // Znaleziono duplikat
+        }
+
+        card_count++;
+
+        if (card_count > 13) {
+            return false; // Zbyt wiele kart
+        }
+    }
+
+    return card_count == 13; // Sprawdzamy, czy przetworzono dokładnie 13 kart
 }
 
 // sprawdzam poprawność wiadomości DEAL
@@ -112,12 +152,44 @@ bool Klient::validate_DEAL(const std::string& message){
     }
 
     // sprawdzenie czy lista kart jest poprawna
-    int card_counter = 0;
-    for(){
-
+    if(is_valid_hand(message.substr(6, 39)) == false){
+        return false;
     }
 
+    // dodaje karty do klienta
+    return true;
 }
+
+// konwertuje stringa do talii kart
+std::vector<Card> cards_to_set(const std::string& hand) {
+    std::vector<Card> card_set;
+
+    size_t i = 0;
+    size_t hand_length = hand.length();
+
+    while (i < hand_length) {
+        std::string rank_str;
+        char color;
+
+        if (i + 2 < hand_length && hand.substr(i, 2) == "10") {
+            rank_str = "10"; // Ranga to "10"
+            color = hand[i + 2]; // Kolor jest na pozycji 3 (indeks i + 2)
+            i += 3;
+        } else if (i + 1 < hand_length) {
+            rank_str = hand.substr(i, 1); // Ranga to jeden znak (2-9, J, Q, K, A)
+            color = hand[i + 1]; // Kolor jest na pozycji 2 (indeks i + 1)
+            i += 2;
+        } else {
+            throw std::invalid_argument("Niekompletna karta w stringu");
+        }
+
+        Rank rank = string_to_rank(rank_str);
+        card_set.push_back(Card(color, rank));
+    }
+
+    return card_set;
+}
+
 
 int Klient::run(){
 
@@ -178,35 +250,12 @@ int Klient::run(){
         // w message znajduje się wiadomość, gotowa do analizy
         if(message.substr(0, 4) == "BUSY"){
 
-            // sprawdzenie poprawności wiadomości BUSY
-            // poprawna wiadomość BUSY może mieć maksymalnie 8 znaków
-            // poprawna wiadomość BUSY może zawierać tylko znaki N, S, E, W
-            // poprawna wiadomość BUSY musi zawierać znak gracza, który próbuje dołączyć
-            if(message.length() > 8){
-                cerr << "Niepoprawna wiadomość serwera\n";
-                cerr << message.c_str() << "\n";
+            if(validate_BUSY(message) == false){
+                std::cerr << "Niepoprawna wiadomość serwera\n";
+                std::cerr << message.c_str() << "\n";
                 incorrect_message = true;
-            
-            // jeśli na liście pozycji nie znajduje się znak gracza, który próbuje dołączyć
-            }else if(message.substr(4).find(position) == std::string::npos){
-                cerr << "Niepoprawna wiadomość serwera\n";
-                cerr << message.c_str() << "\n";
-                incorrect_message = true;
-            
-            // jeśli na liście pozycji znajduje się znak, który nie powinien tam być
             }else{
-                // sprawdzenie czy lista zawiera tylko odpowiednie znaki
-                for(int i = 4; i < message.length(); i++){
-                    if(message[i] != 'N' && message[i] != 'S' && message[i] != 'E' && message[i] != 'W'){
-                        cerr << "Niepoprawna wiadomość serwera\n";
-                        cerr << message.c_str() << "\n";
-                        incorrect_message = true;
-                        break;
-                    }
-
-            }
-            // wiadomość busy jest poprawna, zamykam połączenie
-            if(!incorrect_message){
+                // zamykam połączenie
                 close(socket_fd);
                 return -1;
             }
@@ -214,97 +263,38 @@ int Klient::run(){
         // analizuję wiadomość DEAL
         }else if(message.substr(0, 4) == "DEAL"){
 
-            // sprawdzenie poprawności wiadomości DEAL
-            // sprawdzenie typu rozdania
-            if(message.length() < 32 || message.length() > 36){
+            if(validate_DEAL(message) == false){
                 cerr << "Niepoprawna wiadomość serwera\n";
                 cerr << message.c_str() << "\n";
                 incorrect_message = true;
-
-            }else if(){
-
+            }else{
+                CardSet.cards = cards_to_set(message.substr(6, 39));
             }
         
-        // inne wiadomości ignoruję jako błędne wiadomości serwera
         }else{
             cerr << "Niepoprawna wiadomość serwera\n";
             cerr << message.c_str() << "\n";
+            incorrect_message = true;
         }
 
         // sprawdzam czy otrzymana wiadomość jest poprawna czy nie
         if(incorrect_message){
             cout << "Czekam na następne wiadomości\n";
         }else{
+            // czyli tak naprawdę tylko w przypadku DEAL
             break;
         }
     }
 
-
-    // liczba otrzymanych bajtów
-
-    // jeśli wystąpił błąd podczas 
-
-    // otrzymaliśmy wiadomość, dodajemy terminalne zero na końcu
-
-    // otrzymałem jakąś wiadmość, teraz chcę ją przeanalizować
-
-    std::string accumulated_data;
-    accumulated_data.append(buffer, bytes_received);
-    size_t pos = 0;
-
-    // dopóki w buforze nie znajdę braku dopasowania
-    while((pos = accumulated_data.find("\r\n")) != std::string::npos){
-
-        message = accumulatedData.substr(0, pos);
-        accumulated_data.erase(0, pos + 2);
-
-        // jeśli wiadomość to "busy"
-        if(message.substr(0, 4) == "BUSY"){
-            std::cout << "Miejsce przy stole jest zajęte\n";
-
-            // możliwe przyczyny niepoprawności tego rodzaju komunikatu
-            // muszę jeszcze sprawdzić poprawność otrzymanej wiadomości
-            if(message.length() > 8){
-                // niepoprawna wiadomość
-            }
-            // jeśli w 
-            bool my_position = false;
-
-            // sprawdzam czy w wiadomości znajduje się mój znak i czy znajdują się tylko poprawne znaki
-            for(int i = 4; i < message.length(); i++){
-                if(message[i] != 'N' && message[i] != 'S' && message[i] != 'E' && message[i] != 'W'){
-                    // niepoprawna wiadomość
-                }
-                if(message[i] == position){
-                    my_position = true;
-                }
-
-            }
-            if(my_position == false){
-                // niepoprawna wiadomość
-            }
-
-
-            close(socket_fd);
-            return -1;
-
-        // jeśli wiadomość to "DEAL"
-        }else if(message.substr(0, 4) == "DEAL"){
-            std::cout << "Rozpoczęcie rozgrywki\n";
-
-            // tutaj powinienem otrzymać 13 kart
-            break;
-        
-        // inne wiadomości są ignorowane
-        }else{
-
-        }
-
+    // w tym miejscu klient otrzymał swoje karty do gry
+    cout << "Otrzymano karty, rozpoczynam grę\n";
+    
+    // czekam na wiadomość trick
+    for(;;){
 
     }
 
-
-    // odpowiadanie na komunikaty typu trick
+    
 
 
 
@@ -361,6 +351,9 @@ int Klient::receive_message(int socket_fd){
     buffer[bytes_received] = '\0';
     std::cout << "Otrzymano wiadomość: " << buffer << "\n";
 }
+
+
+
 
 // funkcja nawiązująca połączenie przez klienta
 int Klient::connect_to_server(){
