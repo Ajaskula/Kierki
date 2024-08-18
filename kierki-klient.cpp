@@ -19,6 +19,9 @@ int main(int argc, char *argv[]){
         return 1;
     }
 
+    Klient klient(host, port, IPv4, IPv6, position, isBot);
+    int ret_value = klient.run();
 
-    return 0;
+
+    return ret_value;
 }

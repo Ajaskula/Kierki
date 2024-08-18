@@ -8,8 +8,9 @@
 #include "klient.h"
 #include "common.h"
 #include <netdb.h>
+#include <poll.h>
 
-// metoda nie związana z klasą klienta
+// ta metoda wydaje się być w porządku
 int Klient::parseArguments(int argc, char *argv[], std::string& host, uint16_t& port, bool& IPv4, bool& IPv6, char& position, bool& isBot){
     for(int i = 1; i < argc; i++){
         std::string arg = argv[i];
@@ -23,10 +24,14 @@ int Klient::parseArguments(int argc, char *argv[], std::string& host, uint16_t& 
             i++;
             // std::cout << "Port: " << port << "\n";
         }else if(arg == "-4"){
-            IPv4 = true;
+            if(IPv6 == false && IPv4 == false){
+                IPv4 = true;
+            }
             // std::cout << "IPv4\n";
         }else if(arg == "-6"){
-            IPv6 = true;
+            if(IPv4 == false && IPv6 == false){
+                IPv6 = true;
+            }
             // std::cout << "IPv6\n";
         }else if(arg == "-N"){
             position = 'N';
@@ -226,16 +231,19 @@ std::vector<Card> cards_to_set(const std::string& hand) {
 
 int Klient::run(){
 
-    // nawiązanie połączenia
     int socket_fd = connect_to_server();
-
-    // jeśli nie udąło się nawiązać połączenia
     if(socket_fd == -1){
         std::cerr << "Nie udało się nawiązać połączenia\n";
         return 1;
     }
-
     std::cout << "Połączenie nawiązane\n";
+
+    // przygotowanie struktury pollfd
+    struct pollfd fds[2];
+    fds[0].fd = socket_fd;  // gniazdo serwera
+    fds[0].events = POLLIN;
+    fds[1].fd = STDIN_FILENO;  // stdin
+    fds[1].events = POLLIN;
 
     // wyślij wiadomość powitalną do serwera
     std::string message = std::string("IAM") + position + "\r\n";
@@ -392,55 +400,41 @@ int Klient::receive_message(int socket_fd){
 
 // funkcja nawiązująca połączenie przez klienta
 int Klient::connect_to_server(){
+
             std::cout << "Próba połączenia z serwerem " << host << " na porcie " << port << "\n";
-
-            // hints jest zmienną lokalną, która służy do przekazywania informacji o tym, jakiego typu adresy chcemy uzyskać
-            // res jest wskaznikiem na strukturę, która będzie przechowywać wynik działania funkcji getaddrinfo
             struct addrinfo hints, *res;
-            memset(&hints, 0, sizeof (hints)); // wypełniamy strukturę hints zerami
+            memset(&hints, 0, sizeof (hints)); 
 
-            // w zależności od tego co zostało podane ustawiam odpowiedni atrybut w strukturze hints
             if(IPv4){
-                hints.ai_family = AF_INET; // chcemy uzyskać adresy IPv4
+                hints.ai_family = AF_INET;
             }else if(IPv6){
-                hints.ai_family = AF_INET6; // chcemy uzyskać adresy IPv6
+                hints.ai_family = AF_INET6;
             }else{
-                hints.ai_family = AF_UNSPEC; // chcemy uzyskać adresy IPv4 lub IPv6
+                hints.ai_family = AF_UNSPEC;
             }
-            hints.ai_socktype = SOCK_STREAM; // chcemy uzyskać adresy dla protokołu TCP
+            hints.ai_socktype = SOCK_STREAM;
 
-            // funkcja getaddrinfo zwraca 0, jeśli udało się uzyskać adresy
             if(getaddrinfo(host.c_str(), std::to_string(port).c_str(), &hints, &res) != 0){
                 std::cerr << "Nie udało się uzyskać adresów\n";
-                return 1;
+                return -1;
             }
 
-            // tworzenie socketu i próba połączenia
             int socket_fd;
-            // iteruje poprzez wszystkie adresy zwrócone przez getaddrinfo
             for(struct addrinfo *p = res; p != NULL; p = p->ai_next){
                 
-                // próba utowrzenia socketu
                 socket_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
                 if(socket_fd == -1){
                     continue;
-                } // próba kolejnego połączenia
-
+                }
                 if(connect(socket_fd, p->ai_addr, p->ai_addrlen) == -1){
                     close(socket_fd);
                     continue;
-                } // próba kolejnego połączenia
-
+                }
                 freeaddrinfo(res);
                 return socket_fd;
             }
             
-            // zwolni całą listę uzyskanych adresów na raz
             freeaddrinfo(res);
-            return 1;
+            return -1;
 }
 
-// int main(){
-//     std::cout << "Kierki\n";
-//     return 0;
-// }

@@ -2,13 +2,13 @@ CXX = g++
 CXXFLAGS = -std=c++11 -Wall
 
 # Source files
-SRCS = common.cpp klient.cpp kierki-klient.cpp
+SRCS = common.cpp klient.cpp kierki-klient.cpp # kierki-serwer.cpp
 
 # Object files
 OBJS = $(SRCS:.cpp=.o)
 
 # Executable
-TARGET = kierki-klient
+TARGET = kierki-klient # kierki-serwer
 
 # Default rule
 all: $(TARGET)
