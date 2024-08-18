@@ -1,30 +1,36 @@
+#include<string>
+#include<vector>
+#include<iostream>
 #ifndef COMMON_H
 #define COMMON_H
 
 
+enum class Rank { Two, Three, Four, Five, Six, Seven, Eight, Nine, Ten, Jack, Queen, King, Ace, Unknown };
 
 class Card{
     public:
         enum class Color {Heart, Diamond, Club, Spade};
-        enum class Rank { Two, Three, Four, Five, Six, Seven, Eight, Nine, Ten, Jack, Queen, King, Ace };
         // konstruktor karty
-        Card(Color color, Rank rank);
+        Card(char color, Rank rank);
         // destruktor karty
         ~Card();
         // metoda zwracająca kolor karty
-        Color getColor() const;
+        char getColor() const;
         // metoda zwracająca wartość karty
         Rank getValue() const;
         // metoda konwertująca karty na string
         std::string toString() const;
     private:
         // atrybuty karty
-        Color color;
+        char color;
         Rank rank;
 
         // metoda konwertująca wartość karty na string
+        // metody z konst nie zmieniają stanu obiektu
         std::string rankToString(Rank rank) const;
+        Rank string_to_rank(const std::string& rank) const;
         std::string colorToString(Color color) const;
+        Rank getRank() const;
 };
 
 

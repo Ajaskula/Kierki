@@ -1,5 +1,4 @@
-
-
+#include "common.h"
 // implementacja metod klasowych klasy Card
 Card::Card(char color, Rank rank) : color(color), rank(rank) {
     std::cout << "Instancja karty została stworzona\n";
@@ -43,7 +42,7 @@ std::string Card::rankToString(Rank rank) const {
 }
 
 // zamienia podany string na wartość typu rank
-std::string_to_rank(const std::string& rank) const {
+Rank Card::string_to_rank(const std::string& rank) const {
     if(rank == "2"){
         return Rank::Two;
     }else if(rank == "3"){
@@ -76,12 +75,12 @@ std::string_to_rank(const std::string& rank) const {
 }
 
 std::string Card::toString() const {
-    return rankToString(rank) + " of " + colorToString(color);
+    return rankToString(rank) + " of " + color;
 }
-Card::Rank Card::getRank() const {
+Rank Card::getRank() const {
     return rank;
 }
-Card::Color Card::getColor() const {
+char Card::getColor() const {
     return color;
 }
 
@@ -97,9 +96,10 @@ CardSet::~CardSet(){
 }
 
 void CardSet::initializeFullDeck(){
+    char colors[] = {'H', 'D', 'C', 'S'};
     for(int i = 0; i < 4; i++){
         for(int j = 0; j < 13; j++){
-            cards.push_back(Card(static_cast<Card::Color>(i), static_cast<Card::Rank>(j)));
+            cards.push_back(Card(colors[i], static_cast<Rank>(j)));
         }
     }
 }

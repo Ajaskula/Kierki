@@ -5,29 +5,42 @@
 
 // metoda nie związana z klasą klienta
 int parseArguments(int argc, char *argv[], std::string& host, uint16_t& port, bool& IPv4, bool& IPv6, char& position, bool& isBot){
-    for(int i = 0; i < argc; i++){
+    for(int i = 1; i < argc; i++){
         std::string arg = argv[i];
 
         if(arg == "-h" && i + 1 < argc){
             host = argv[i + 1];
+            i++;
+            // std::cout << "Host: " << host << "\n";
         }else if(arg == "-p" && i + 1 < argc){
             port = std::stoi(argv[i + 1]);
+            i++;
+            // std::cout << "Port: " << port << "\n";
         }else if(arg == "-4"){
             IPv4 = true;
+            // std::cout << "IPv4\n";
         }else if(arg == "-6"){
             IPv6 = true;
+            // std::cout << "IPv6\n";
         }else if(arg == "-N"){
             position = 'N';
+            // std::cout << "Pozycja: N\n";
         }else if(arg == "-S"){
             position = 'S';
+            // std::cout << "Pozycja: S\n";
         }else if(arg == "-E"){
             position = 'E';
+            // std::cout << "Pozycja: E\n";
         }else if(arg == "-W"){
             position = 'W';
+            // std::cout << "Pozycja: W\n";
         }else if(arg == "-a"){
             isBot = true;
+            // std::cout << "Bot\n";
         }else{
             std::cerr << "Nieznany parametr: " << arg << "\n";
+            // tutaj się muszę zastanowić czy na pewno mam wtedy przerwać
+            return 1;
         }
 
     }
@@ -35,7 +48,7 @@ int parseArguments(int argc, char *argv[], std::string& host, uint16_t& port, bo
         std::cerr << "Nie można jednocześnie używać IPv4 i IPv6\n";
         return 1;
     }
-    if("\0" == position){
+    if('\0' == position){
         std::cerr << "Nie podano pozycji\n";
         return 1;
     }
@@ -47,6 +60,13 @@ int parseArguments(int argc, char *argv[], std::string& host, uint16_t& port, bo
         std::cerr << "Obowiązkowy parametr -h nie został podany\n";
         return 1;
     }
+    std::cout << "Host: " << host << "\n";
+    std::cout << "Port: " << port << "\n";
+    std::cout << "IPv4: " << IPv4 << "\n";
+    std::cout << "IPv6: " << IPv6 << "\n";
+    std::cout << "Pozycja: " << position << "\n";
+    std::cout << "Bot: " << isBot << "\n";
+    
     return 0;
 }
 
@@ -199,7 +219,7 @@ int Klient::run(){
     // jeśli nie udąło się nawiązać połączenia
     if(socket_fd == -1){
         std::cerr << "Nie udało się nawiązać połączenia\n";
-        return -1;
+        return 1;
     }
 
     std::cout << "Połączenie nawiązane\n";
@@ -228,11 +248,11 @@ int Klient::run(){
         if(bytes_received == -1){
             std::cerr << "Błąd podczas odbierania wiadomości\n";
             close(socket_fd);
-            return -1;
+            return 1;
         }else if(bytes_received == 0){
             std::cerr << "Serwer zamknął połączenie\n";
             close(socket_fd);
-            return -1;
+            return 1;
         }
 
         std::cout << "Otrzymano wiadomość: " << buffer << "\n";
@@ -257,7 +277,7 @@ int Klient::run(){
             }else{
                 // zamykam połączenie
                 close(socket_fd);
-                return -1;
+                return 1;
             }
 
         // analizuję wiadomość DEAL
@@ -288,8 +308,9 @@ int Klient::run(){
 
     // w tym miejscu klient otrzymał swoje karty do gry
     cout << "Otrzymano karty, rozpoczynam grę\n";
-    
+
     // czekam na wiadomość trick
+    int curr_lewa = 1;
     for(;;){
 
     }
@@ -377,7 +398,7 @@ int Klient::connect_to_server(){
             // funkcja getaddrinfo zwraca 0, jeśli udało się uzyskać adresy
             if(getaddrinfo(host.c_str(), std::to_string(port).c_str(), &hints, &res) != 0){
                 std::cerr << "Nie udało się uzyskać adresów\n";
-                return -1;
+                return 1;
             }
 
             // tworzenie socketu i próba połączenia
@@ -402,7 +423,7 @@ int Klient::connect_to_server(){
             
             // zwolni całą listę uzyskanych adresów na raz
             freeaddrinfo(res);
-            return -1;
+            return 1;
 }
 
 
