@@ -1,10 +1,16 @@
 #include <iostream>
 #include <string>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <sys/socket.h>
+#include <regex>
+#include <set>
 #include "klient.h"
 #include "common.h"
+#include <netdb.h>
 
 // metoda nie związana z klasą klienta
-int parseArguments(int argc, char *argv[], std::string& host, uint16_t& port, bool& IPv4, bool& IPv6, char& position, bool& isBot){
+int Klient::parseArguments(int argc, char *argv[], std::string& host, uint16_t& port, bool& IPv4, bool& IPv6, char& position, bool& isBot){
     for(int i = 1; i < argc; i++){
         std::string arg = argv[i];
 
@@ -87,7 +93,7 @@ bool Klient::validate_BUSY(const std::string& message){
         return false;
     }
     // poprawna wiadomość BUSY może zawierać tylko znaki N, S, E, W
-    for(int i = 4; i < message.length(); i++){
+    for(std::string::size_type i = 4; i < message.length(); i++){
         if(message[i] != 'N' && message[i] != 'S' && message[i] != 'E' && message[i] != 'W'){
             return false;
         }
@@ -97,7 +103,7 @@ bool Klient::validate_BUSY(const std::string& message){
         return false;
     }
     // każdy ze znaków N, S , E, W może wystąpić tylko raz
-    for(int i = 4; i < message.length(); i++){
+    for(std::string::size_type i = 4; i < message.length(); i++){
         // metoda rfind zwraca pierwsze występienia znaku od końca
         if(message.substr(4).find(message[i]) != message.substr(4).rfind(message[i])){
             return false;
@@ -162,7 +168,14 @@ bool Klient::validate_DEAL(const std::string& message){
         return false;
     }
     // sprawdzenie typu rozdania
-    if(atoi(message[4]) < 1 || atoi(message[4]) > 7){
+    if (message.length() > 4 && std::isdigit(message[4])) {
+        int value = message[4] - '0'; // Convert char to int
+        
+        // Check if the value is within the desired range
+        if (value < 1 || value > 7) {
+            return false;
+        }
+    } else {
         return false;
     }
 
@@ -203,7 +216,7 @@ std::vector<Card> cards_to_set(const std::string& hand) {
             throw std::invalid_argument("Niekompletna karta w stringu");
         }
 
-        Rank rank = string_to_rank(rank_str);
+        Rank rank = Card::string_to_rank(rank_str);
         card_set.push_back(Card(color, rank));
     }
 
@@ -225,7 +238,7 @@ int Klient::run(){
     std::cout << "Połączenie nawiązane\n";
 
     // wyślij wiadomość powitalną do serwera
-    std::string message = "IAM" + position + "\r\n";
+    std::string message = std::string("IAM") + position + "\r\n";
     send_message(socket_fd, message);
 
     // w tym miejscu klient czeka na odpowiedź od serwera
@@ -258,7 +271,7 @@ int Klient::run(){
         std::cout << "Otrzymano wiadomość: " << buffer << "\n";
 
         // szukam pierwszego wystąpienia \r\n
-        string accumulated_data(buffer, bytes_received);
+        std::string accumulated_data(buffer, bytes_received);
 
         size_t pos = accumulated_data.find("\r\n");
         if(pos != std::string::npos){
@@ -284,22 +297,22 @@ int Klient::run(){
         }else if(message.substr(0, 4) == "DEAL"){
 
             if(validate_DEAL(message) == false){
-                cerr << "Niepoprawna wiadomość serwera\n";
-                cerr << message.c_str() << "\n";
+                std::cerr << "Niepoprawna wiadomość serwera\n";
+                std::cerr << message.c_str() << "\n";
                 incorrect_message = true;
             }else{
-                CardSet.cards = cards_to_set(message.substr(6, 39));
+                // CardSet.cards = cards_to_set(message.substr(6, 39));
             }
         
         }else{
-            cerr << "Niepoprawna wiadomość serwera\n";
-            cerr << message.c_str() << "\n";
+            std::cerr << "Niepoprawna wiadomość serwera\n";
+            std::cerr << message.c_str() << "\n";
             incorrect_message = true;
         }
 
         // sprawdzam czy otrzymana wiadomość jest poprawna czy nie
         if(incorrect_message){
-            cout << "Czekam na następne wiadomości\n";
+            std::cout << "Czekam na następne wiadomości\n";
         }else{
             // czyli tak naprawdę tylko w przypadku DEAL
             break;
@@ -307,10 +320,10 @@ int Klient::run(){
     }
 
     // w tym miejscu klient otrzymał swoje karty do gry
-    cout << "Otrzymano karty, rozpoczynam grę\n";
+    std::cout << "Otrzymano karty, rozpoczynam grę\n";
 
     // czekam na wiadomość trick
-    int curr_lewa = 1;
+    // int curr_lewa = 1;
     for(;;){
 
     }
@@ -365,12 +378,13 @@ int Klient::receive_message(int socket_fd){
     } else if (bytes_received == 0){
         std::cerr << "Serwer zamknął połączenie\n";
         close(socket_fd);
-        return;
+        return 1;
     }
 
     // dodajemy terminalne zero na końcu otrzymanej wiadomości
     buffer[bytes_received] = '\0';
     std::cout << "Otrzymano wiadomość: " << buffer << "\n";
+    return 0;
 }
 
 
@@ -426,4 +440,7 @@ int Klient::connect_to_server(){
             return 1;
 }
 
-
+// int main(){
+//     std::cout << "Kierki\n";
+//     return 0;
+// }

@@ -1,27 +1,23 @@
-#include <iostream>
-#include <vector>
-#include <string>
+#include "common.h"
 #include "klient.h"
 
 int main(int argc, char *argv[]){
 
-    string host;
+
+    // tutaj spróbuje zaimplementować metodę parseArguments
+    std::cout << "Uruchomienie klienta" << std::endl;
+
+    std::string host;
     uint16_t port = 0;
-    bool IPv4 = true;
+    bool IPv4 = false;
     bool IPv6 = false;
     char position = '\0';
     bool isBot = false;
-    
-    // parsuje argumenty, na podstawie 
-    if(parseArguments(argc, argv, host, port, IPv4, IPv6, position, isBot)){
+
+    if(Klient::parseArguments(argc, argv, host, port, IPv4, IPv6, position, isBot) == -1){
+        std::cout << "Podane parametry są niepoprawne\n";
         return 1;
     }
-
-    // tworzę instancję klienta na podstawie podanych argumentów
-    Klient klient(host, port, IPv4, IPv6, position, isBot);
-    // uruchamiam klienta
-    klient.run();
-
 
 
     return 0;

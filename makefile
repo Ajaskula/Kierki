@@ -1,29 +1,25 @@
-# nazwa pliku wykonywalnego
-TARGET = klient
-
-#kompilator i opcje kompilatora
 CXX = g++
-CXXFLAGS = -Wall -g
+CXXFLAGS = -std=c++11 -Wall
 
-# Pliki źródłowe
-SOURCES = common.cpp klient.cpp
+# Source files
+SRCS = common.cpp klient.cpp kierki-klient.cpp
 
-# Pliki obiektowe
-OBJECTS = $(SOURCES:.cpp=.o)
+# Object files
+OBJS = $(SRCS:.cpp=.o)
 
-# Domyślna reguła
+# Executable
+TARGET = kierki-klient
+
+# Default rule
 all: $(TARGET)
 
-# Reguła budowy pliku wykonywalnego
-$(TARGET): $(OBJECTS)
-	$(CXX) $(CXXFLAGS) -o $@ $(OBJECTS)
+$(TARGET): $(OBJS)
+	$(CXX) $(CXXFLAGS) -o $(TARGET) $(OBJS)
 
-# Reguła budowy plików obiektowych
+# Compile .cpp files into .o files
 %.o: %.cpp
-	$(CXX) $(CXXFLAGS) -c $<
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-# Reguła czyszczenia katalogu
+# Clean rule
 clean:
-	rm -f $(OBJECTS) $(TARGET)
-
-rebuild: clean all
+	rm -f $(OBJS) $(TARGET)

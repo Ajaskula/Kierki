@@ -42,7 +42,7 @@ std::string Card::rankToString(Rank rank) const {
 }
 
 // zamienia podany string na wartość typu rank
-Rank Card::string_to_rank(const std::string& rank) const {
+Rank Card::string_to_rank(const std::string& rank) {
     if(rank == "2"){
         return Rank::Two;
     }else if(rank == "3"){
@@ -109,12 +109,12 @@ void CardSet::addCard(Card card){
     cards.push_back(card);
 }
 
-void addCards(const std::string& cards){
-    for(int i = 0; i < cards.length(); i+=2){
-        Card card(static_cast<Card::Color>(cards[i]), static_cast<Card::Rank>(cards[i+1]));
-        addCard(card);
-    }
-}
+// void addCards(const std::string& cards){
+//     for(int i = 0; i < cards.length(); i+=2){
+//         Card card(static_cast<Card::Color>(cards[i]), static_cast<Rank>(cards[i+1]));
+//         addCard(card);
+//     }
+// }
 
 // usuwa kartę z talii
 void CardSet::removeCard(Card card){

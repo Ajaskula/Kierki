@@ -1,8 +1,9 @@
+#ifndef COMMON_H
+#define COMMON_H
+
 #include<string>
 #include<vector>
 #include<iostream>
-#ifndef COMMON_H
-#define COMMON_H
 
 
 enum class Rank { Two, Three, Four, Five, Six, Seven, Eight, Nine, Ten, Jack, Queen, King, Ace, Unknown };
@@ -20,6 +21,8 @@ class Card{
         Rank getValue() const;
         // metoda konwertująca karty na string
         std::string toString() const;
+        Rank getRank() const;
+        static Rank string_to_rank(const std::string& rank);
     private:
         // atrybuty karty
         char color;
@@ -28,9 +31,7 @@ class Card{
         // metoda konwertująca wartość karty na string
         // metody z konst nie zmieniają stanu obiektu
         std::string rankToString(Rank rank) const;
-        Rank string_to_rank(const std::string& rank) const;
         std::string colorToString(Color color) const;
-        Rank getRank() const;
 };
 
 
@@ -49,9 +50,9 @@ class CardSet{
         Card getCard() const;
         // metoda zwracająca ilość kart w talii
         int getSize() const;
+        std::vector<Card> cards;
     private:
         // atrybuty talii kart
-        std::vector<Card> cards;
         
         void initializeFullDeck();
 };
