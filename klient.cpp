@@ -83,7 +83,7 @@ int Klient::parseArguments(int argc, char *argv[], std::string& host, uint16_t& 
 
 Klient::Klient(const std::string& host, uint16_t port, bool IPv4, bool IPv6,
         char position, bool isBot)
-        : host(host), port(port), IPv4(IPv4), IPv6(IPv6), position(position), isBot(isBot), cardSet(), points(0)
+        : host(host), port(port), IPv4(IPv4), IPv6(IPv6), position(position), isBot(isBot), cardSet(), points(0), trick_history()
         {
             std::cout << "Instancja klienta została stworzona\n";
         }
@@ -121,6 +121,14 @@ bool Klient::validate_BUSY(const std::string& message){
 bool is_valid_card(const std::string& card){
     static const std::regex card_regex("^(10|[2-9]|[JQKA])[CDHS]$");
     return std::regex_match(card, card_regex);
+}
+// funkcja wypisuje karty, które klient, aktualnie ma na ręce
+void Klient::print_hand(){
+    std::cout << "Karty na ręce: ";
+    for(const Card& card : cardSet.cards){
+        std::cout << card.to_string() << " ";
+    }
+    std::cout << "\n";
 }
 
 // sprawdzam czy otrzymane karty są poprawne
@@ -228,6 +236,15 @@ std::vector<Card> cards_to_set(const std::string& hand) {
     return card_set;
 }
 
+// wyświetla historię wziętych lew
+void Klient::print_trick_history(){
+    std::cout << "Historia wziętych lew: ";
+    for(const std::string& trick : trick_history){
+        std::cout << trick << " ";
+    }
+    std::cout << "\n";
+}
+
 
 int Klient::run(){
 
@@ -238,109 +255,181 @@ int Klient::run(){
     }
     std::cout << "Połączenie nawiązane\n";
 
-    // przygotowanie struktury pollfd
+    // wysyłam do serwera wiadomość IAM
+    std::string message = std::string("IAM") + position + "\r\n";
+    send_message(socket_fd, message);
+    // jeśli jestem botem raportuje wysłaną wiadomość
+    if(isBot){
+        std::cout << message;
+    }
+    
+
     struct pollfd fds[2];
     fds[0].fd = socket_fd;  // gniazdo serwera
     fds[0].events = POLLIN;
+    // tutaj czekam na wejściu standardowym
     fds[1].fd = STDIN_FILENO;  // stdin
     fds[1].events = POLLIN;
 
-    // wyślij wiadomość powitalną do serwera
-    std::string message = std::string("IAM") + position + "\r\n";
-    send_message(socket_fd, message);
+    // bufor na wiadomości od serwera
+    char buffer[1024];
+    memset(buffer, 0, 1024);
+    size_t buffer_index = 0;
 
-    // w tym miejscu klient czeka na odpowiedź od serwera
-    // możliwe odpowiedzi to:
-    // - busy i zakończenie połączenia, jeśli miejsce przy stole jest zajęte
-    // Deal i rozpoczęcie rozgrywki
-    // wszystkie inne rzeczy są ignorowane (niepoprawne odpowiedzi serwera)
+    while(true){
 
-    // odbieranie wiadomości od serwera, wiadomość znajdzie się we wskazanym buforze
-
-    const size_t buffer_size = 1024;
-    char buffer[buffer_size] = {0};
-    ssize_t bytes_received = 0;
-    for(;;){
-        bool incorrect_message = false;
-        // odbieram wiadomość
-        bytes_received = recv(socket_fd, buffer, buffer_size - 1, 0);
-
-        // wystąpił błąd, lub serwer zamknął połączenie
-        if(bytes_received == -1){
-            std::cerr << "Błąd podczas odbierania wiadomości\n";
-            close(socket_fd);
-            return 1;
-        }else if(bytes_received == 0){
-            std::cerr << "Serwer zamknął połączenie\n";
-            close(socket_fd);
-            return 1;
+        for(int i = 0; i < 2; i++){
+            fds[i].revents = 0;
         }
 
-        std::cout << "Otrzymano wiadomość: " << buffer << "\n";
-
-        // szukam pierwszego wystąpienia \r\n
-        std::string accumulated_data(buffer, bytes_received);
-
-        size_t pos = accumulated_data.find("\r\n");
-        if(pos != std::string::npos){
-            message = accumulated_data.substr(0, pos);
-            accumulated_data.erase(0, pos + 2);
+        int poll_count = poll(fds, 2, -1); // Czekamy na zdarzenie
+        if (poll_count < 0) {
+            std::cerr << "Poll error" << std::endl;
             break;
+            close(socket_fd);
+            return 1;
         }
 
-        // w message znajduje się wiadomość, gotowa do analizy
-        if(message.substr(0, 4) == "BUSY"){
+        // odczytanie wiadomości od serwera
+        if(fds[0].revents & POLLIN){
+            ssize_t bytes_received = read(socket_fd, &buffer[buffer_index], 1);
 
-            if(validate_BUSY(message) == false){
-                std::cerr << "Niepoprawna wiadomość serwera\n";
-                std::cerr << message.c_str() << "\n";
-                incorrect_message = true;
-            }else{
-                // zamykam połączenie
+            if(bytes_received == -1){
+                std::cerr << "Błąd podczas odbierania wiadomości\n";
+                close(socket_fd);
+                return 1;
+            }else if(bytes_received == 0){
+                std::cerr << "Serwer zamknął połączenie\n";
                 close(socket_fd);
                 return 1;
             }
+            char received_char = buffer[buffer_index];
+            buffer_index++;
+            // jeśli odebrany bajt to znak nowej linni
+            if(received_char == '\n'){
+                if(buffer_index > 1 && buffer[buffer_index - 2] == '\r'){
+                    buffer[0] = '\0';
+                    buffer_index = 0;
+                    if(isBot){
+                        // raportuje wiadomość od serwera
+                        std::cout << buffer;
+                    }
+                    // sprawdzam jaką wiadomość dostałem
+                    if(0){
 
-        // analizuję wiadomość DEAL
-        }else if(message.substr(0, 4) == "DEAL"){
+                    }else if(0){
 
-            if(validate_DEAL(message) == false){
-                std::cerr << "Niepoprawna wiadomość serwera\n";
-                std::cerr << message.c_str() << "\n";
-                incorrect_message = true;
-            }else{
-                // CardSet.cards = cards_to_set(message.substr(6, 39));
+                    }else if(0){
+
+                    }else if(0){
+
+                    }
+                }
             }
+        }
+        if(fds[1].revents & POLLIN){
+            // odczytanie wiadomości od klienta
+            std::string message;
+            std::cin >> message;
+            std::cout << "Otrzymano wiadomość z stdin: " << message << "\n";
+            // wysłanie wiadomości do serwera
+            // send_message(socket_fd, message);
+            if("cards" == message){
+                std::cout << "Wypisuje karty\n";
+                print_hand();
+                std::cout << getCurrentTime() << "\n";
+            }
+            if("tricks" == message){
+                print_trick_history();
+            }
+            // jeśli przyszło polecenie dołożenia karty wysyłam komunikat trick
+            if(0){
+
+            }
+
+        }
+    }
+
+
+    // const size_t buffer_size = 1024;
+    // char buffer[buffer_size] = {0};
+    // ssize_t bytes_received = 0;
+    // for(;;){
+    //     bool incorrect_message = false;
+    //     // odbieram wiadomość
+    //     bytes_received = recv(socket_fd, buffer, buffer_size - 1, 0);
+
+    //     // wystąpił błąd, lub serwer zamknął połączenie
+    //     if(bytes_received == -1){
+    //         std::cerr << "Błąd podczas odbierania wiadomości\n";
+    //         close(socket_fd);
+    //         return 1;
+        // }else if(bytes_received == 0){
+        //     std::cerr << "Serwer zamknął połączenie\n";
+        //     close(socket_fd);
+        //     return 1;
+        // }
+
+        // std::cout << "Otrzymano wiadomość: " << buffer << "\n";
+
+        // // szukam pierwszego wystąpienia \r\n
+        // std::string accumulated_data(buffer, bytes_received);
+
+        // size_t pos = accumulated_data.find("\r\n");
+        // if(pos != std::string::npos){
+        //     message = accumulated_data.substr(0, pos);
+        //     accumulated_data.erase(0, pos + 2);
+        //     break;
+        // }
+
+        // // w message znajduje się wiadomość, gotowa do analizy
+        // if(message.substr(0, 4) == "BUSY"){
+
+        //     if(validate_BUSY(message) == false){
+        //         std::cerr << "Niepoprawna wiadomość serwera\n";
+        //         std::cerr << message.c_str() << "\n";
+        //         incorrect_message = true;
+        //     }else{
+        //         // zamykam połączenie
+        //         close(socket_fd);
+        //         return 1;
+        //     }
+
+        // // analizuję wiadomość DEAL
+        // }else if(message.substr(0, 4) == "DEAL"){
+
+        //     if(validate_DEAL(message) == false){
+        //         std::cerr << "Niepoprawna wiadomość serwera\n";
+        //         std::cerr << message.c_str() << "\n";
+        //         incorrect_message = true;
+        //     }else{
+        //         // CardSet.cards = cards_to_set(message.substr(6, 39));
+        //     }
         
-        }else{
-            std::cerr << "Niepoprawna wiadomość serwera\n";
-            std::cerr << message.c_str() << "\n";
-            incorrect_message = true;
-        }
+    //     }else{
+    //         std::cerr << "Niepoprawna wiadomość serwera\n";
+    //         std::cerr << message.c_str() << "\n";
+    //         incorrect_message = true;
+    //     }
 
-        // sprawdzam czy otrzymana wiadomość jest poprawna czy nie
-        if(incorrect_message){
-            std::cout << "Czekam na następne wiadomości\n";
-        }else{
-            // czyli tak naprawdę tylko w przypadku DEAL
-            break;
-        }
-    }
+    //     // sprawdzam czy otrzymana wiadomość jest poprawna czy nie
+    //     if(incorrect_message){
+    //         std::cout << "Czekam na następne wiadomości\n";
+    //     }else{
+    //         // czyli tak naprawdę tylko w przypadku DEAL
+    //         break;
+    //     }
+    // }
 
-    // w tym miejscu klient otrzymał swoje karty do gry
-    std::cout << "Otrzymano karty, rozpoczynam grę\n";
 
-    // czekam na wiadomość trick
-    // int curr_lewa = 1;
-    for(;;){
 
-    }
-
+    // }
     
-
-
-
+    //     // zamykam połączenie
+    // close(socket_fd);
+    return 0;
 }
+
 
 // funkcja pozwala na wysyłanie wiadomości do serwera
 // podaje deskryptor gniazda, na który ma zostać wysłana wiadomość

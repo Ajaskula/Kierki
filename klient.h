@@ -2,7 +2,11 @@
 #define KLIENT_H
 
 #include <string>
+#include <vector>
 #include "common.h"
+
+// limit na rozmiar wiadomości
+#define MESSAGE_LIMIT 1000
 
 
 class Klient{
@@ -19,6 +23,9 @@ class Klient{
         bool validate_DEAL(const std::string& message);
         void send_message(int socket_fd, const std::string& message);
         int receive_message(int socket_fd);
+        // wypisuje karty, które aktualnie posiada klient
+        void print_hand();
+        void print_trick_history();
 
     private:
 
@@ -31,6 +38,7 @@ class Klient{
         bool isBot;
         CardSet cardSet;
         int points;
+        std::vector<std::string> trick_history;
 
         // metoday klienta
         int connect_to_server();

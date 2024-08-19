@@ -4,7 +4,13 @@
 #include<string>
 #include<vector>
 #include<iostream>
+#include<ctime>
+#include<chrono>
+#include<sstream>
+#include<iomanip>
 
+std::string getCurrentTime();
+std::string getServerAddress(int socket_fd)
 
 enum class Rank { Two, Three, Four, Five, Six, Seven, Eight, Nine, Ten, Jack, Queen, King, Ace, Unknown };
 
@@ -20,9 +26,10 @@ class Card{
         // metoda zwracająca wartość karty
         Rank getValue() const;
         // metoda konwertująca karty na string
-        std::string toString() const;
+        std::string to_string() const;
         Rank getRank() const;
         static Rank string_to_rank(const std::string& rank);
+
     private:
         // atrybuty karty
         char color;

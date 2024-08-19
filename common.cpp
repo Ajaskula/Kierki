@@ -74,7 +74,7 @@ Rank Card::string_to_rank(const std::string& rank) {
     }
 }
 
-std::string Card::toString() const {
+std::string Card::to_string() const {
     return rankToString(rank) + " of " + color;
 }
 Rank Card::getRank() const {
@@ -133,4 +133,57 @@ Card CardSet::getCard() const {
 // zwraca rozmiar kolekcji kart
 int CardSet::getSize() const {
     return cards.size();
+}
+
+// funkcja, zwracająca aktualny czas w formacie ISO 8601
+std::string getCurrentTime() {
+    // Pobranie aktualnego czasu
+    auto now = std::chrono::system_clock::now();
+
+    // Konwersja do czasu kalendarzowego
+    std::time_t now_time = std::chrono::system_clock::to_time_t(now);
+
+    // Konwersja do struktury tm dla lokalnego czasu
+    std::tm local_time = *std::localtime(&now_time);
+
+    // Wyciągnięcie milisekund
+    auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
+
+    // Użycie stringstream do stworzenia formatowanego stringa
+    std::ostringstream oss;
+    oss << std::put_time(&local_time, "%Y-%m-%dT%H:%M:%S")    // Czas bez milisekund
+        << '.' << std::setw(3) << std::setfill('0') << now_ms.count();  // Milisekundy
+
+    return oss.str();
+}
+
+std::string getServerAddress(int socket_fd) {
+    struct sockaddr_storage addr;
+    socklen_t addr_len = sizeof(addr);
+
+    // Pobieranie adresu serwera
+    if (getpeername(socket_fd, (struct sockaddr*)&addr, &addr_len) != 0) {
+        perror("getpeername failed");
+        return "";
+    }
+
+    char ip_str[INET6_ADDRSTRLEN];
+    std::string server_address;
+
+    // Obsługa IPv4
+    if (addr.ss_family == AF_INET) {
+        struct sockaddr_in* s = (struct sockaddr_in*)&addr;
+        inet_ntop(AF_INET, &s->sin_addr, ip_str, sizeof(ip_str));
+        server_address = ip_str;
+        server_address += ":" + std::to_string(ntohs(s->sin_port));
+    } 
+    // Obsługa IPv6
+    else if (addr.ss_family == AF_INET6) {
+        struct sockaddr_in6* s = (struct sockaddr_in6*)&addr;
+        inet_ntop(AF_INET6, &s->sin6_addr, ip_str, sizeof(ip_str));
+        server_address = ip_str;
+        server_address += ":" + std::to_string(ntohs(s->sin6_port));
+    }
+
+    return server_address;
 }
