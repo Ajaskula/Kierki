@@ -8,9 +8,15 @@
 #include<chrono>
 #include<sstream>
 #include<iomanip>
+#include <arpa/inet.h>    // Dla inet_ntop
+#include <netinet/in.h>   // Dla sockaddr_in
+#include <sys/socket.h>   // Dla socket, connect
+#include <unistd.h> 
 
 std::string getCurrentTime();
-std::string getServerAddress(int socket_fd)
+std::string getServerAddress(int socket_fd);
+std::string getLocalAddress(int socket_fd);
+std::string raport(const std::string& addr1, const std::string& addr2, const std::string& message);
 
 enum class Rank { Two, Three, Four, Five, Six, Seven, Eight, Nine, Ten, Jack, Queen, King, Ace, Unknown };
 

@@ -109,12 +109,6 @@ void CardSet::addCard(Card card){
     cards.push_back(card);
 }
 
-// void addCards(const std::string& cards){
-//     for(int i = 0; i < cards.length(); i+=2){
-//         Card card(static_cast<Card::Color>(cards[i]), static_cast<Rank>(cards[i+1]));
-//         addCard(card);
-//     }
-// }
 
 // usuwa kartę z talii
 void CardSet::removeCard(Card card){
@@ -186,4 +180,37 @@ std::string getServerAddress(int socket_fd) {
     }
 
     return server_address;
+}
+// zwraca lokalny adres gniazda
+std::string getLocalAddress(int socket_fd) {
+    struct sockaddr_storage addr;
+    socklen_t addr_len = sizeof(addr);
+
+    // Pobieranie lokalnego adresu
+    if (getsockname(socket_fd, (struct sockaddr*)&addr, &addr_len) != 0) {
+        perror("getsockname failed");
+        return "";
+    }
+
+    char ip_str[INET6_ADDRSTRLEN];
+    std::string local_address;
+
+    // Obsługa IPv4
+    if (addr.ss_family == AF_INET) {
+        struct sockaddr_in* s = (struct sockaddr_in*)&addr;
+        inet_ntop(AF_INET, &s->sin_addr, ip_str, sizeof(ip_str));
+        local_address = ip_str;
+        local_address += ":" + std::to_string(ntohs(s->sin_port));
+    } 
+    // Obsługa IPv6
+    else if (addr.ss_family == AF_INET6) {
+        struct sockaddr_in6* s = (struct sockaddr_in6*)&addr;
+        inet_ntop(AF_INET6, &s->sin6_addr, ip_str, sizeof(ip_str));
+        local_address = ip_str;
+        local_address += ":" + std::to_string(ntohs(s->sin6_port));
+    }
+    return local_address;
+}
+std::string raport(const std::string& addr1, const std::string& addr2, const std::string& message){
+    return "[" + addr1 + "," + addr2 +","+ getCurrentTime() + "] " + message;
 }

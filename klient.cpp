@@ -10,7 +10,6 @@
 #include <netdb.h>
 #include <poll.h>
 
-// ta metoda wydaje się być w porządku
 int Klient::parseArguments(int argc, char *argv[], std::string& host, uint16_t& port, bool& IPv4, bool& IPv6, char& position, bool& isBot){
     for(int i = 1; i < argc; i++){
         std::string arg = argv[i];
@@ -18,39 +17,29 @@ int Klient::parseArguments(int argc, char *argv[], std::string& host, uint16_t& 
         if(arg == "-h" && i + 1 < argc){
             host = argv[i + 1];
             i++;
-            // std::cout << "Host: " << host << "\n";
         }else if(arg == "-p" && i + 1 < argc){
             port = std::stoi(argv[i + 1]);
             i++;
-            // std::cout << "Port: " << port << "\n";
         }else if(arg == "-4"){
             if(IPv6 == false && IPv4 == false){
                 IPv4 = true;
             }
-            // std::cout << "IPv4\n";
         }else if(arg == "-6"){
             if(IPv4 == false && IPv6 == false){
                 IPv6 = true;
             }
-            // std::cout << "IPv6\n";
         }else if(arg == "-N"){
             position = 'N';
-            // std::cout << "Pozycja: N\n";
         }else if(arg == "-S"){
             position = 'S';
-            // std::cout << "Pozycja: S\n";
         }else if(arg == "-E"){
             position = 'E';
-            // std::cout << "Pozycja: E\n";
         }else if(arg == "-W"){
             position = 'W';
-            // std::cout << "Pozycja: W\n";
         }else if(arg == "-a"){
             isBot = true;
-            // std::cout << "Bot\n";
         }else{
             std::cerr << "Nieznany parametr: " << arg << "\n";
-            // tutaj się muszę zastanowić czy na pewno mam wtedy przerwać
             return 1;
         }
 
@@ -83,10 +72,7 @@ int Klient::parseArguments(int argc, char *argv[], std::string& host, uint16_t& 
 
 Klient::Klient(const std::string& host, uint16_t port, bool IPv4, bool IPv6,
         char position, bool isBot)
-        : host(host), port(port), IPv4(IPv4), IPv6(IPv6), position(position), isBot(isBot), cardSet(), points(0), trick_history()
-        {
-            std::cout << "Instancja klienta została stworzona\n";
-        }
+        : host(host), port(port), IPv4(IPv4), IPv6(IPv6), position(position), isBot(isBot), cardSet(), points(0), trick_history(){}
 Klient::~Klient(){
             std::cout << "Instancja klienta została zniszczona\n";
         }
@@ -249,12 +235,12 @@ void Klient::print_trick_history(){
 int Klient::run(){
 
     int socket_fd = connect_to_server();
+    std::string local_address = getLocalAddress(socket_fd);
+    std::string server_address = getServerAddress(socket_fd);
     if(socket_fd == -1){
         std::cerr << "Nie udało się nawiązać połączenia\n";
         return 1;
     }
-    std::cout << "Połączenie nawiązane\n";
-
     // wysyłam do serwera wiadomość IAM
     std::string message = std::string("IAM") + position + "\r\n";
     send_message(socket_fd, message);
@@ -263,7 +249,6 @@ int Klient::run(){
         std::cout << message;
     }
     
-
     struct pollfd fds[2];
     fds[0].fd = socket_fd;  // gniazdo serwera
     fds[0].events = POLLIN;
@@ -304,27 +289,50 @@ int Klient::run(){
                 return 1;
             }
             char received_char = buffer[buffer_index];
+            std::cout << "Otrzymano bajt: " << received_char << "\n";
+            std::cout << "Numer bajta w kodzie ascii: " << (int)received_char << "\n";
             buffer_index++;
             // jeśli odebrany bajt to znak nowej linni
             if(received_char == '\n'){
                 if(buffer_index > 1 && buffer[buffer_index - 2] == '\r'){
-                    buffer[0] = '\0';
                     buffer_index = 0;
                     if(isBot){
-                        // raportuje wiadomość od serwera
-                        std::cout << buffer;
+                        std::cout << raport(server_address, local_address, buffer);
                     }
-                    // sprawdzam jaką wiadomość dostałem
+                    // BUSY
                     if(0){
-
+                    
+                    // DEAL
                     }else if(0){
 
+                    // TRICK
                     }else if(0){
 
+                    // WRONG
                     }else if(0){
+
+                    // TAKEN
+                    }else if(){
+
+                    // SCORE
+                    }else if{
+
+                    // TOTAL
+                    }else if(){
 
                     }
+                    memset(buffer, 0, 1024);
                 }
+            }
+            // jeśli przekroczyłem limit długości wiadomości
+            if(buffer_index == MESSAGE_LIMIT){
+                buffer[buffer_index] = '\r';
+                buffer[buffer_index + 1] = '\n';
+                if(isBot){
+                    std::cout << raport(server_address, local_address, buffer);
+                }
+                buffer_index = 0;
+                memset(buffer, 0, 1024);
             }
         }
         if(fds[1].revents & POLLIN){
@@ -337,7 +345,10 @@ int Klient::run(){
             if("cards" == message){
                 std::cout << "Wypisuje karty\n";
                 print_hand();
-                std::cout << getCurrentTime() << "\n";
+                // std::cout << getCurrentTime() << "\n";
+                // std::cout << getServerAddress(socket_fd) << "\n";
+                // std::cout << getLocalAddress(socket_fd) << "\n";
+                std::cout << raport(server_address, local_address, "Wypisuje karty\r\n");
             }
             if("tricks" == message){
                 print_trick_history();
@@ -351,82 +362,6 @@ int Klient::run(){
     }
 
 
-    // const size_t buffer_size = 1024;
-    // char buffer[buffer_size] = {0};
-    // ssize_t bytes_received = 0;
-    // for(;;){
-    //     bool incorrect_message = false;
-    //     // odbieram wiadomość
-    //     bytes_received = recv(socket_fd, buffer, buffer_size - 1, 0);
-
-    //     // wystąpił błąd, lub serwer zamknął połączenie
-    //     if(bytes_received == -1){
-    //         std::cerr << "Błąd podczas odbierania wiadomości\n";
-    //         close(socket_fd);
-    //         return 1;
-        // }else if(bytes_received == 0){
-        //     std::cerr << "Serwer zamknął połączenie\n";
-        //     close(socket_fd);
-        //     return 1;
-        // }
-
-        // std::cout << "Otrzymano wiadomość: " << buffer << "\n";
-
-        // // szukam pierwszego wystąpienia \r\n
-        // std::string accumulated_data(buffer, bytes_received);
-
-        // size_t pos = accumulated_data.find("\r\n");
-        // if(pos != std::string::npos){
-        //     message = accumulated_data.substr(0, pos);
-        //     accumulated_data.erase(0, pos + 2);
-        //     break;
-        // }
-
-        // // w message znajduje się wiadomość, gotowa do analizy
-        // if(message.substr(0, 4) == "BUSY"){
-
-        //     if(validate_BUSY(message) == false){
-        //         std::cerr << "Niepoprawna wiadomość serwera\n";
-        //         std::cerr << message.c_str() << "\n";
-        //         incorrect_message = true;
-        //     }else{
-        //         // zamykam połączenie
-        //         close(socket_fd);
-        //         return 1;
-        //     }
-
-        // // analizuję wiadomość DEAL
-        // }else if(message.substr(0, 4) == "DEAL"){
-
-        //     if(validate_DEAL(message) == false){
-        //         std::cerr << "Niepoprawna wiadomość serwera\n";
-        //         std::cerr << message.c_str() << "\n";
-        //         incorrect_message = true;
-        //     }else{
-        //         // CardSet.cards = cards_to_set(message.substr(6, 39));
-        //     }
-        
-    //     }else{
-    //         std::cerr << "Niepoprawna wiadomość serwera\n";
-    //         std::cerr << message.c_str() << "\n";
-    //         incorrect_message = true;
-    //     }
-
-    //     // sprawdzam czy otrzymana wiadomość jest poprawna czy nie
-    //     if(incorrect_message){
-    //         std::cout << "Czekam na następne wiadomości\n";
-    //     }else{
-    //         // czyli tak naprawdę tylko w przypadku DEAL
-    //         break;
-    //     }
-    // }
-
-
-
-    // }
-    
-    //     // zamykam połączenie
-    // close(socket_fd);
     return 0;
 }
 

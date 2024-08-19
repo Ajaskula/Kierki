@@ -14,7 +14,7 @@ int main(int argc, char *argv[]){
     char position = '\0';
     bool isBot = false;
 
-    if(Klient::parseArguments(argc, argv, host, port, IPv4, IPv6, position, isBot) == -1){
+    if(Klient::parseArguments(argc, argv, host, port, IPv4, IPv6, position, isBot) == 1){
         std::cout << "Podane parametry są niepoprawne\n";
         return 1;
     }
