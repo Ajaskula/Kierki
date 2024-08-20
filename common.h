@@ -67,6 +67,7 @@ class CardSet{
         // metoda zwracająca ilość kart w talii
         int getSize() const;
         std::vector<Card> cards;
+        bool isCardInSet(const Card& card) const;
     private:
         // atrybuty talii kart
         

@@ -136,6 +136,39 @@ bool is_valid_hand(const std::string& hand) {
 
     return card_count == 13; // Sprawdzamy, czy przetworzono dokładnie 13 kart
 }
+bool is_valid_card_list(const std::string& hand) {
+    // zbiór do przechowywanie unikalnych kart
+    std::set<std::string> unique_cards; // Zbiór do przechowywania unikalnych kart
+
+    // przetwarzanie karty po karcie
+    size_t i = 0;
+    size_t hand_length = hand.length();
+    // int card_count = 0;
+
+    // dopóki nie przejdę przez cały string
+    while (i < hand_length) {
+        std::string card;
+
+        if (i + 2 < hand_length && hand.substr(i, 2) == "10") {
+            card = hand.substr(i, 3); // Karta to "10X"
+            i += 3;
+        } else if (i + 1 < hand_length) {
+            card = hand.substr(i, 2); // Karta to "VX"
+            i += 2;
+        } else {
+            return false; // Niekompletna karta na końcu stringa
+        }
+
+        if (!is_valid_card(card)) {
+            return false; // Znaleziono niepoprawną kartę
+        }
+
+        if (!unique_cards.insert(card).second) {
+            return false; // Znaleziono duplikat
+        }
+    }
+    return true;
+}
 
 bool Klient::validate_BUSY(const std::string& message){
     if(message.length() > 10 || message.length() < 7){
@@ -194,6 +227,7 @@ bool Klient::validate_DEAL(const std::string& message){
  
     return true;
 }
+
 bool Klient::validate_TRICK(const std::string& message){
     if(message.length() < 8 || message.length() > 18){
         return false;
@@ -201,29 +235,168 @@ bool Klient::validate_TRICK(const std::string& message){
     if(message.substr(0, 5) != "TRICK"){
         return false;
     }
-    if(!(message[6] == '1' && message[7] <= '3' && message[7] >= '0') && !(message[6] >= '1' && message[6] <= '9' && !isdigit(message[7]))){
+    if(!(message[5] == '1' && message[6] <= '3' && message[6] >= '0') && !(message[5] >= '1' && message[5] <= '9' && !isdigit(message[6]))){
         return false;
     }
     int trick_number = 0;
-    if(message[6] == '1'){
-        trick_number = 10 + message[7] - '0';
+    if(message[5] == '1'){
+        trick_number = 10;
+        if (isdigit(message[6])){
+            trick_number += message[6] - '0';
+        }
     }else{
-        trick_number = message[6] - '0';
+        trick_number = message[5] - '0';
     }
     if(trick_number != current_trick){
         return false;
     }
 
     // sprawdzenie listy kart, czy zawiera poprawne karty
-    vector<string> cards_vec = extract_hand(message.substr(8, message.length() - 8 - (trick_number >= 10)));
+    if(!is_valid_card_list(message.substr(7 - (trick_number >= 10), message.length() - 8 - (trick_number >= 10)))){
+        return false;
+    }
+    vector<string> cards_vec = extract_hand(message.substr(7 - (trick_number >= 10), message.length() - 8 - (trick_number >= 10)));
     
-    // jeśli długość listy kart nie jest poprawna
     if(cards_vec.size() >= 4){
         return false;
     }
+
+    // muszę jeszcze sprawdzić, czy nie posiadam takiej karty jak te wyłożone na stole
+    for(int i = 0; i < cards_vec.size(); i++){
+        if(isCardInSet(string_to_card(cards_vec[i]))){
+            return false;
+        }
+    }
+    return true;
+}
+bool Klient::validate_TAKEN(const std::string& message){
+
+    // sprawdzenie długości
+    if(message.length < 17 || message.length > 22){
+        return false;
+    }
+
+    // sprawdzenie pierwszego słowa
+    if(message.substr(0, 5) != "TAKEN"){
+        return false;
+    }
+
+    // sprawdzenie numeru lewy
+    if(!(message[5] == '1' && message[6] <= '3' && message[6] >= '0') && !(message[5] >= '1' && message[5] <= '9' && !isdigit(message[6]))){
+        return false;
+    }
+    int trick_number = 0;
+    if(message[5] == '1'){
+        trick_number = 10;
+        if (isdigit(message[6])){
+            trick_number += message[6] - '0';
+        }
+    }else{
+        trick_number = message[5] - '0';
+    }
+    if(trick_number != current_trick){
+        return false;
+    }
+
+    if(!is_valid_card_list(message.substr(7 - (trick_number >= 10), message.length() - 9 - (trick_number >= 10)))){
+        return false;
+    }
+    vector<string> cards_vec = extract_hand(message.substr(7 - (trick_number >= 10), message.length() - 9 - (trick_number >= 10)));
+    int in_my_hand = 0;
+    for(int i = 0; i < cards_vec.size(); i++){
+        if(isCardInSet(string_to_card(cards_vec[i]))){
+            in_my_hand++;
+        }
+    }
+    if(in_my_hand != 1){
+        return false;
+    }
+
+    if(message[message.length() - 3] != 'N' && message[message.length() - 3] != 'S' && message[message.length() - 3] != 'E' && message[message.length() - 3] != 'W'){
+        return false;
+    }
+    
+    return true;
+}
+bool Klient::validate_WRONG(const std::string& message){
+    // sprawdzenie długości
+    if(message.length() < 8 || message.length() > 9){
+        return false;
+    }
+    if(message.substr(0, 5) != "WRONG"){
+        return false;
+    }
+    // sprawdzenie numeru lewy
+    if(!(message[5] == '1' && message[6] <= '3' && message[6] >= '0') && !(message[5] >= '1' && message[6] <= '9' && !isdigit(message[6]))){
+        return false;
+    }
+    int trick_number = 0;
+    if(message[5] == '1'){
+        trick_number = 10;
+        if (isdigit(message[6])){
+            trick_number += message[6] - '0';
+        }
+    }else{
+        trick_number = message[5] - '0';
+    }
+    if(trick_number != current_trick){
+        return false;
+    }
+
+    return true;
 }
 
+bool validate_SCORE(const std::string& message){
 
+    const std::regex pattern(R"(SCORE[NSEW]\d+[NSEW]\d+[NSEW]\d+[NSEW]\d+\r\n)");
+    if (!std::regex_match(message, pattern)) {
+        return false;
+    }
+
+    std::unordered_map<char, int> seat_count = {{'N', 0}, {'S', 0}, {'E', 0}, {'W', 0}};
+
+    // Przejdź przez ciąg i zlicz wystąpienia liter N, S, E, W
+    for (char ch : input) {
+        if (seat_count.find(ch) != seat_count.end()) {
+            seat_count[ch]++;
+        }
+    }
+
+    // Sprawdź, czy każda litera wystąpiła dokładnie raz
+    for (const auto& pair : seat_count) {
+        if (pair.second != 1) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool validate_TOTAL(const std::string& message){
+
+    const std::regex pattern(R"(TOTAL[NSEW]\d+[NSEW]\d+[NSEW]\d+[NSEW]\d+\r\n)");
+    if (!std::regex_match(message, pattern)) {
+        return false;
+    }
+
+    std::unordered_map<char, int> seat_count = {{'N', 0}, {'S', 0}, {'E', 0}, {'W', 0}};
+
+    // Przejdź przez ciąg i zlicz wystąpienia liter N, S, E, W
+    for (char ch : input) {
+        if (seat_count.find(ch) != seat_count.end()) {
+            seat_count[ch]++;
+        }
+    }
+
+    // Sprawdź, czy każda litera wystąpiła dokładnie raz
+    for (const auto& pair : seat_count) {
+        if (pair.second != 1) {
+            return false;
+        }
+    }
+
+    return true;
+}
 int Klient::validate_message(const std::string& message){
 
     if(isBot){
@@ -237,6 +410,18 @@ int Klient::validate_message(const std::string& message){
     }
     if(validate_TRICK(message)){
         return TRICK;
+    }
+    if(validate_TAKEN(message)){
+        return TAKEN;
+    }
+    if(validate_WRONG(message)){
+        return WRONG;
+    }
+    if(validate_SCORE(message)){
+        return SCORE;
+    }
+    if(validate_TOTAL(message)){
+        return TOTAL;
     }
 
     return -1;
@@ -301,6 +486,50 @@ std::string Klient::print_dealed_cards(const std::string& message){
         }
     }
     return dealed_cards;
+}
+
+std::string extract_cards_from_TRICK(const std::string& input) {
+    // Wyrażenie regularne do zidentyfikowania części z kartami
+    std::regex pattern(R"(TRICK\d+((?:\d{1,2}|[JQKA])[CSDH]+)\r\n)");
+    std::smatch matches;
+
+    // Sprawdź, czy ciąg pasuje do wzorca i wyciągnij listę kart
+    if (std::regex_search(input, matches, pattern) && matches.size() > 1) {
+        std::string card_list = matches[1].str();
+        std::string result;
+
+        // Iteruj przez listę kart i formatuj je poprawnie
+        for (size_t i = 0; i < card_list.size();) {
+            std::string card;
+
+            // Sprawdź, czy karta to "10"
+            if (i + 1 < card_list.size() && card_list[i] == '1' && card_list[i + 1] == '0') {
+                card = card_list.substr(i, 3); // karta "10X"
+                i += 3;
+            } else {
+                card = card_list.substr(i, 2); // karta "VX"
+                i += 2;
+            }
+
+            // Dodaj kartę do wyniku
+            if (!result.empty()) {
+                result += ", ";
+            }
+            result += card;
+        }
+
+        return result;
+    }
+
+    return ""; // Zwróć pusty ciąg, jeśli format nie pasuje
+}
+
+bool is_valid_card_format(const std::string& input) {
+    // Wyrażenie regularne do sprawdzenia formatu !karta
+    std::regex pattern(R"(^!(10|[2-9]|[JQKA])[CSDH]$)");
+
+    // Sprawdzenie, czy ciąg pasuje do wzorca
+    return std::regex_match(input, pattern);
 }
 
 
@@ -377,7 +606,7 @@ int Klient::run(){
 
                         }else if(validate_message(message) == DEAL){
                             if(!isBot){
-                                std::cout << "New deal " + message[4] + ": staring place " + message[5] + ", your cards: " + print_dealed_cards +".\n"
+                                std::cout << "New deal " + message[4] + ": staring place " + message[5] + ", your cards: " + print_dealed_cards(message.substr(6, message.length() - 8)) +".\n"
                             }
                             // dodaje karty do tali
                             cardSet.add_cards(message.substr(6, message.length() - 8));
@@ -397,10 +626,13 @@ int Klient::run(){
 
                             // wypisuje instrukcję dla zawodnika
                             if(!isBot){
-                                
+                                std::cout << "Trick: (" + curr_trick + ") " + extract_cards_from_TRICK(message) + "\n";
+                                std::cout << "Available: " + cardSet.print_cards_on_hand() + "\n";
                             // sam wykonuje ruch
                             }else{
-
+                                // wykonuje ruch
+                                // żeby wiedzieć do jakiego koloru muszę dołożyć muszę pamiętać, kto ostatni wychodzi
+                                // jeśli nie mam takiego koloru daje dowolną kartę
                             }
                         }else if(validate_message(message) == TAKEN){
                             
@@ -468,9 +700,9 @@ int Klient::run(){
             if("tricks" == message){
                 print_trick_history();
             }
-            if(/*sprawdzam czy wiadomość jest próbą wysłania poprawnej karty*/){
-                std::cout << "Wysyłem poprawną kartę\n";
-                // wysyłam kartę
+            if(is_valid_card_format(message)){
+                std::string to_send = "TRICK" + std::to_string(current_trick) + message.substr(1) + "\r\n";
+                send_message(socket_fd, to_send);
             }
 
         }
@@ -493,7 +725,6 @@ void Klient::send_message(int socket_fd, const std::string &message){
         raport(getLocalAddress(socket_fd), getServerAddress(socket_fd), message);
     }
 }
-
 
 // funkcja nawiązująca połączenie przez klienta
 int Klient::connect_to_server(){

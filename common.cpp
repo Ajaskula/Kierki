@@ -83,12 +83,30 @@ Rank Card::getRank() const {
 char Card::getColor() const {
     return color;
 }
+std::string CardsSet::print_cards_on_hand(){
+    std::string cards_on_hand = "";
+    for(auto card : cards){
+        cards_on_hand += card.to_string() + ", ";
+    }
+    return cards_on_hand.substr(0, cards_on_hand.length() - 2);
+}
 
 // konstruktor talii z pełnym deckiem
 CardSet::CardSet(bool fullDeck) : cards() {
     if(fullDeck){
         initializeFullDeck();
     }
+}
+bool CardSet::isCardInSet(const Card& card) const {
+    for(auto c : cards){
+        if(c.getColor() == card.getColor() && c.getRank() == card.getRank()){
+            return true;
+        }
+    }
+    return false;
+}
+Card string_to_card(const std::string& card){
+    return Card(card[card.length()-1], Card::string_to_rank(card.substr(0, card.length() - 1)));
 }
 
 CardSet::~CardSet(){
