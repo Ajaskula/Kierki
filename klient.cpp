@@ -532,6 +532,18 @@ bool is_valid_card_format(const std::string& input) {
     return std::regex_match(input, pattern);
 }
 
+char get_first_card_color(const std::string& message) {
+    // Zaktualizowane wyrażenie regularne, aby wyodrębnić kolor pierwszej karty
+    std::regex pattern(R"(TRICK\d+(?:\d{1,2}|[JQKA])([CSDH]).*\r\n)");
+    std::smatch matches;
+
+    if (std::regex_search(message, matches, pattern)) {
+        return matches[1].str()[0]; // matches[1] to kolor pierwszej karty
+    }
+
+    return '0'; // Zwraca '0', jeśli nie znaleziono dopasowania
+}
+
 
 int Klient::run(){
 
@@ -628,11 +640,15 @@ int Klient::run(){
                             if(!isBot){
                                 std::cout << "Trick: (" + curr_trick + ") " + extract_cards_from_TRICK(message) + "\n";
                                 std::cout << "Available: " + cardSet.print_cards_on_hand() + "\n";
-                            // sam wykonuje ruch
+                            // urzytkownik sam wykonuje ruch
                             }else{
+                                
                                 // wykonuje ruch
-                                // żeby wiedzieć do jakiego koloru muszę dołożyć muszę pamiętać, kto ostatni wychodzi
+                                // dokładam dowolną kartę
+                                Card card = cardSet.get_card_of_color(get_first_card_color(message));
+                                std::string to_send = "TRICK" + std::to_string(current_trick) + card.getColor + card.rankToString(card.getRank()) + "\r\n";
                                 // jeśli nie mam takiego koloru daje dowolną kartę
+                                send_message(socket_fd, to_send);
                             }
                         }else if(validate_message(message) == TAKEN){
                             
@@ -640,10 +656,11 @@ int Klient::run(){
                             if(wait_first_TRICK && !got_TRICK){
                                 // jeśli dostałem już tricka w tej iteracji
                                 curr_trick++;
+                                // znajduje wśród swoich kart tą, którą ja położyłem na stół
+                                // usuwam ją z talii
                             }else if(got_TRICK){
                                 // performuje normalnie to co powinienem
 
-                            // komunikat taken w tej sytuacji jest nie poprawny
                                 curr_trick++;
                             }
 
@@ -652,12 +669,14 @@ int Klient::run(){
                             if(!isBot){
                                 std::cout << "Wrong message received in trick "+ message[5] +".\n";
                             }
+                            // tutaj chyba nic nie robię
                         }
                     
                     // tutaj powinienem otrzymać SCORE i TOTAL
                     // tutaj jest okej, bo mogę to otrzymać jedynie gdy curr_trick == 14
                     }else{
                         if(validate_message(message) == SCORE){
+                            // w przypadku tej implementacj też chyba nic nie robię
                             if(!isBot){
 
                             }

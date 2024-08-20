@@ -29,13 +29,13 @@ std::string Card::rankToString(Rank rank) const {
         case Rank::Ten:
             return "10";
         case Rank::Jack:
-            return "Jack";
+            return "J";
         case Rank::Queen:
-            return "Queen";
+            return "Q";
         case Rank::King:
-            return "King";
+            return "K";
         case Rank::Ace:
-            return "Ace";
+            return "A";
         default:
             return "Unknown";
     }
@@ -83,13 +83,26 @@ Rank Card::getRank() const {
 char Card::getColor() const {
     return color;
 }
-std::string CardsSet::print_cards_on_hand(){
+std::string CardSet::print_cards_on_hand(){
     std::string cards_on_hand = "";
     for(auto card : cards){
         cards_on_hand += card.to_string() + ", ";
     }
     return cards_on_hand.substr(0, cards_on_hand.length() - 2);
 }
+
+Card CardSet::get_card_of_color(char color = '0'){
+    for(auto card : cards){
+        if(color == '0' || card.getColor() == color){
+            return card;
+        }
+    }
+    if(!cards.empty()){
+        return cards[0];
+    }
+    return Card('0', Rank::Unknown);
+}
+
 
 // konstruktor talii z pełnym deckiem
 CardSet::CardSet(bool fullDeck) : cards() {
