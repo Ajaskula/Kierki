@@ -7,6 +7,13 @@
 
 // limit na rozmiar wiadomości
 #define MESSAGE_LIMIT 1000
+#define BUSY 1
+#define DEAL 2
+#define TRICK 3
+#define WRONG 4
+#define TAKEN 5
+#define SCORE 6
+#define TOTAL 7
 
 
 class Klient{
@@ -26,6 +33,12 @@ class Klient{
         // wypisuje karty, które aktualnie posiada klient
         void print_hand();
         void print_trick_history();
+        bool wait_DEAL = true;
+        bool wait_TOTAl = true;
+        bool wait_SCORE = true;
+        bool wait_first_TRICK = true;
+        bool got_TRICK = false;
+        int current_trick = 1;
 
     private:
 
@@ -38,11 +51,13 @@ class Klient{
         bool isBot;
         CardSet cardSet;
         int points;
+        int socket_fd;
         std::vector<std::string> trick_history;
 
         // metoday klienta
         int connect_to_server();
         bool is_valid_card(const std::string& card);
+        int validate_message(const std::string& message);
 };
 
 #endif // KLIENT_H

@@ -110,6 +110,39 @@ void CardSet::addCard(Card card){
 }
 
 
+std::vector<std::string> CardsSet::extract_hand(const std::string& hand) {
+    std::vector<std::string> cards; // Wektor do przechowywania kart
+    size_t i = 0;
+    size_t hand_length = hand.length();
+
+    while (i < hand_length) {
+        std::string card;
+
+        // Sprawdzenie, czy karta to "10" + kolor (3 znaki)
+        if (i + 2 < hand_length && hand.substr(i, 2) == "10") {
+            card = hand.substr(i, 3); // Wyodrębnij "10X"
+            i += 3;
+        } else {
+            // Każda inna karta to jeden znak liczbowy + jeden znak koloru (2 znaki)
+            card = hand.substr(i, 2); // Wyodrębnij "VX"
+            i += 2;
+        }
+
+        // Dodaj kartę do wektora
+        cards.push_back(card);
+    }
+
+    return cards; // Zwróć wektor 13 kart
+}
+
+void CardsSet::add_cards(const std::string& cards){
+    std::vector<std::string> extracted_cards = extract_hand(cards);
+    for(auto card : extracted_cards){
+        addCard(Card(card[card.length()-1], Card::string_to_rank(card.substr(0, card.length() - 1))));
+    }
+}
+
+
 // usuwa kartę z talii
 void CardSet::removeCard(Card card){
     for(auto it = cards.begin(); it != cards.end(); it++){
@@ -211,6 +244,8 @@ std::string getLocalAddress(int socket_fd) {
     }
     return local_address;
 }
-std::string raport(const std::string& addr1, const std::string& addr2, const std::string& message){
-    return "[" + addr1 + "," + addr2 +","+ getCurrentTime() + "] " + message;
+void raport(const std::string& addr1, const std::string& addr2, const std::string& message){
+    std::string str =  "[" + addr1 + "," + addr2 +","+ getCurrentTime() + "] " + message;
+    size_t length = str.length();
+    std::cout.write(str.c_str(), length);
 }

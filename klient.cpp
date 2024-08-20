@@ -72,36 +72,14 @@ int Klient::parseArguments(int argc, char *argv[], std::string& host, uint16_t& 
 
 Klient::Klient(const std::string& host, uint16_t port, bool IPv4, bool IPv6,
         char position, bool isBot)
-        : host(host), port(port), IPv4(IPv4), IPv6(IPv6), position(position), isBot(isBot), cardSet(), points(0), trick_history(){}
+        : host(host), port(port), IPv4(IPv4), IPv6(IPv6), position(position), isBot(isBot), cardSet(), points(0), trick_history(), socket_fd(0),
+        wait_DEAL(true), wait_TOTAL(true), wait_SCORE(true), wait_first_TRICK(true), got_TRICK(false), current_trick(1)
+        {}
 Klient::~Klient(){
             std::cout << "Instancja klienta została zniszczona\n";
         }
 
 // sprawdza poprawność wiadomości BUSY
-bool Klient::validate_BUSY(const std::string& message){
-    // poprawna wiadomość BUSY może mieć maksymalnie 8 znaków i minimalnie 5
-    if(message.length() > 8 || message.length() < 5){
-        return false;
-    }
-    // poprawna wiadomość BUSY może zawierać tylko znaki N, S, E, W
-    for(std::string::size_type i = 4; i < message.length(); i++){
-        if(message[i] != 'N' && message[i] != 'S' && message[i] != 'E' && message[i] != 'W'){
-            return false;
-        }
-    }
-    // poprawna wiadomość BUSY musi zawierać znak gracza, który próbuje dołączyć
-    if(message.substr(4).find(position) == std::string::npos){
-        return false;
-    }
-    // każdy ze znaków N, S , E, W może wystąpić tylko raz
-    for(std::string::size_type i = 4; i < message.length(); i++){
-        // metoda rfind zwraca pierwsze występienia znaku od końca
-        if(message.substr(4).find(message[i]) != message.substr(4).rfind(message[i])){
-            return false;
-        }
-    }
-    return true;
-}
 // sprawdzam w ten sposób, czy karta jest poprawna
 // korzystjąc z wyrażeń regularnych sprawdzam poprawność karty
 bool is_valid_card(const std::string& card){
@@ -159,15 +137,41 @@ bool is_valid_hand(const std::string& hand) {
     return card_count == 13; // Sprawdzamy, czy przetworzono dokładnie 13 kart
 }
 
+bool Klient::validate_BUSY(const std::string& message){
+    if(message.length() > 10 || message.length() < 7){
+        return false;
+    }
+    if(message.substr(0, 4) != "BUSY"){
+        return false;
+    }
+    for(std::string::size_type i = 4; i < message.length() - 2; i++){
+        if(message[i] != 'N' && message[i] != 'S' && message[i] != 'E' && message[i] != 'W'){
+            return false;
+        }
+    }
+    if(message.substr(4).find(position) == std::string::npos){
+        return false;
+    }
+    // każdy ze znaków N, S , E, W może wystąpić tylko raz
+    for(std::string::size_type i = 4; i < message.length(); i++){
+        if(message.substr(4).find(message[i]) != message.substr(4).rfind(message[i])){
+            return false;
+        }
+    }
+    return true;
+}
 // sprawdzam poprawność wiadomości DEAL
 bool Klient::validate_DEAL(const std::string& message){
     
     // zła długość wiadomości
-    if(message.length() < 32 || message.length() > 36){
+    if(message.length() < 34 || message.length() > 38){
+        return false;
+    }
+    if(message.substr(0, 4) != "DEAL"){
         return false;
     }
     // sprawdzenie typu rozdania
-    if (message.length() > 4 && std::isdigit(message[4])) {
+    if (std::isdigit(message[4])) {
         int value = message[4] - '0'; // Convert char to int
         
         // Check if the value is within the desired range
@@ -184,12 +188,58 @@ bool Klient::validate_DEAL(const std::string& message){
     }
 
     // sprawdzenie czy lista kart jest poprawna
-    if(is_valid_hand(message.substr(6, 39)) == false){
+    if(is_valid_hand(message.substr(6, (message.length - 8))) == false){
+        return false;
+    }
+ 
+    return true;
+}
+bool Klient::validate_TRICK(const std::string& message){
+    if(message.length() < 8 || message.length() > 18){
+        return false;
+    }
+    if(message.substr(0, 5) != "TRICK"){
+        return false;
+    }
+    if(!(message[6] == '1' && message[7] <= '3' && message[7] >= '0') && !(message[6] >= '1' && message[6] <= '9' && !isdigit(message[7]))){
+        return false;
+    }
+    int trick_number = 0;
+    if(message[6] == '1'){
+        trick_number = 10 + message[7] - '0';
+    }else{
+        trick_number = message[6] - '0';
+    }
+    if(trick_number != current_trick){
         return false;
     }
 
-    // dodaje karty do klienta
-    return true;
+    // sprawdzenie listy kart, czy zawiera poprawne karty
+    vector<string> cards_vec = extract_hand(message.substr(8, message.length() - 8 - (trick_number >= 10)));
+    
+    // jeśli długość listy kart nie jest poprawna
+    if(cards_vec.size() >= 4){
+        return false;
+    }
+}
+
+
+int Klient::validate_message(const std::string& message){
+
+    if(isBot){
+        raport(getServerAddress(socket_fd), getLocalAddress(socket_fd), message);
+    }
+    if(validate_BUSY(message)){
+        return BUSY;
+    }
+    if(validate_DEAL(message)){
+        return DEAL;
+    }
+    if(validate_TRICK(message)){
+        return TRICK;
+    }
+
+    return -1;
 }
 
 // konwertuje stringa do talii kart
@@ -230,33 +280,49 @@ void Klient::print_trick_history(){
     }
     std::cout << "\n";
 }
+std::string Klient::print_busy_places(const std::string& message){
+    std::busy_places;;
+    for(std::string::size_type i = 4; i < message.length() - 2; i++){
+        busy_places += message[i];
+        // pod warunkiem, że nie jest to ostatni znak
+        if(i != message.length() - 3){
+            busy_places += ", ";
+        }
+    }
+    return busy_places;
+}
+std::string Klient::print_dealed_cards(const std::string& message){
+    std::string dealed_cards;
+    std::vector<string> cards_vec = extract_hand(const std::string& hand);
+    for(int i = 0; i < cards_vec.size(); i++){
+        dealed_cards += cards_vec[i];
+        if(i != cards_vec.size() - 1){
+            dealed_cards += ", ";
+        }
+    }
+    return dealed_cards;
+}
 
 
 int Klient::run(){
 
-    int socket_fd = connect_to_server();
+    socket_fd = connect_to_server();
     std::string local_address = getLocalAddress(socket_fd);
     std::string server_address = getServerAddress(socket_fd);
     if(socket_fd == -1){
         std::cerr << "Nie udało się nawiązać połączenia\n";
         return 1;
     }
-    // wysyłam do serwera wiadomość IAM
+
     std::string message = std::string("IAM") + position + "\r\n";
     send_message(socket_fd, message);
-    // jeśli jestem botem raportuje wysłaną wiadomość
-    if(isBot){
-        std::cout << message;
-    }
     
     struct pollfd fds[2];
-    fds[0].fd = socket_fd;  // gniazdo serwera
+    fds[0].fd = socket_fd;  // socket
     fds[0].events = POLLIN;
-    // tutaj czekam na wejściu standardowym
     fds[1].fd = STDIN_FILENO;  // stdin
     fds[1].events = POLLIN;
 
-    // bufor na wiadomości od serwera
     char buffer[1024];
     memset(buffer, 0, 1024);
     size_t buffer_index = 0;
@@ -270,7 +336,6 @@ int Klient::run(){
         int poll_count = poll(fds, 2, -1); // Czekamy na zdarzenie
         if (poll_count < 0) {
             std::cerr << "Poll error" << std::endl;
-            break;
             close(socket_fd);
             return 1;
         }
@@ -284,43 +349,100 @@ int Klient::run(){
                 close(socket_fd);
                 return 1;
             }else if(bytes_received == 0){
-                std::cerr << "Serwer zamknął połączenie\n";
+                std::cerr << "Serwer zamknął połączenie z klientem\n";
                 close(socket_fd);
-                return 1;
+                if(wait_TOTAl || wait_SCORE){
+                    std::cout<< "rozgrywka zakończona przed kończem rozgrywki\n";
+                    return 1;
+                }else{
+                    std::cout << "rozgrywka zakończona\n";
+                    return 0;
+                }
             }
             char received_char = buffer[buffer_index];
-            std::cout << "Otrzymano bajt: " << received_char << "\n";
-            std::cout << "Numer bajta w kodzie ascii: " << (int)received_char << "\n";
             buffer_index++;
             // jeśli odebrany bajt to znak nowej linni
             if(received_char == '\n'){
                 if(buffer_index > 1 && buffer[buffer_index - 2] == '\r'){
-                    buffer_index = 0;
+                    std::string message(buffer, buffer_index);
                     if(isBot){
-                        std::cout << raport(server_address, local_address, buffer);
+                        raport(server_address, local_address, message);
                     }
-                    // BUSY
-                    if(0){
+                    // jeśli jestem na etapie oczekiwania na wiadomość DEAL lub BUSY
+                    if(wait_for_DEAL){
+                        if(validate_message(message) == BUSY){
+                            if(!isBot){
+                                std::cout << "Place busy, list of busy places received: " + print_busy_places(message) + ".\n";
+                            }
+
+                        }else if(validate_message(message) == DEAL){
+                            if(!isBot){
+                                std::cout << "New deal " + message[4] + ": staring place " + message[5] + ", your cards: " + print_dealed_cards +".\n"
+                            }
+                            // dodaje karty do tali
+                            cardSet.add_cards(message.substr(6, message.length() - 8));
+                            wait_DEAL = false;
+                            wait_SCORE = true;
+                            wait_TOTAl = true;
+                            wait_first_TRICK = true;
+                            got_TRICK = false;
+                            current_trick = 1;
+                        }
+                    }else if(current_trick < 14){
+
+                        // jeśli current trick jest 1 jeden, to mogę dostać TAKEN lub TRICK
+                        if(validate_message(message) == TRICK){
+                            got_TRICK = true;
+                            wait_first_TRICK = false;
+
+                            // wypisuje instrukcję dla zawodnika
+                            if(!isBot){
+                                
+                            // sam wykonuje ruch
+                            }else{
+
+                            }
+                        }else if(validate_message(message) == TAKEN){
+                            
+                            // jeśli nie dostałem jeszcze rzadnego tricka, normalnie performuje taken
+                            if(wait_first_TRICK && !got_TRICK){
+                                // jeśli dostałem już tricka w tej iteracji
+                                curr_trick++;
+                            }else if(got_TRICK){
+                                // performuje normalnie to co powinienem
+
+                            // komunikat taken w tej sytuacji jest nie poprawny
+                                curr_trick++;
+                            }
+
+
+                        }else if(validate_message(message) == WRONG){
+                            if(!isBot){
+                                std::cout << "Wrong message received in trick "+ message[5] +".\n";
+                            }
+                        }
                     
-                    // DEAL
-                    }else if(0){
+                    // tutaj powinienem otrzymać SCORE i TOTAL
+                    // tutaj jest okej, bo mogę to otrzymać jedynie gdy curr_trick == 14
+                    }else{
+                        if(validate_message(message) == SCORE){
+                            if(!isBot){
 
-                    // TRICK
-                    }else if(0){
+                            }
+                            wait_SCORE = false;
 
-                    // WRONG
-                    }else if(0){
+                        }else if(validate_message(message) == TOTAL){
+                            if(!isBot){
 
-                    // TAKEN
-                    }else if(){
-
-                    // SCORE
-                    }else if{
-
-                    // TOTAL
-                    }else if(){
-
+                            }
+                            wait_TOTAL = false;
+                        }
+                        if(!wait_TOTAL && !wait_SCORE){
+                            wait_DEAL = true;
+                        }
                     }
+                    // otrzymałem faktycznie wiadomość
+                    buffer_index = 0;
                     memset(buffer, 0, 1024);
                 }
             }
@@ -329,33 +451,26 @@ int Klient::run(){
                 buffer[buffer_index] = '\r';
                 buffer[buffer_index + 1] = '\n';
                 if(isBot){
-                    std::cout << raport(server_address, local_address, buffer);
+                    raport(server_address, local_address, buffer);
                 }
                 buffer_index = 0;
                 memset(buffer, 0, 1024);
             }
         }
+        // odczytanie wiadomości z stdin
         if(fds[1].revents & POLLIN){
-            // odczytanie wiadomości od klienta
             std::string message;
             std::cin >> message;
-            std::cout << "Otrzymano wiadomość z stdin: " << message << "\n";
-            // wysłanie wiadomości do serwera
-            // send_message(socket_fd, message);
             if("cards" == message){
                 std::cout << "Wypisuje karty\n";
                 print_hand();
-                // std::cout << getCurrentTime() << "\n";
-                // std::cout << getServerAddress(socket_fd) << "\n";
-                // std::cout << getLocalAddress(socket_fd) << "\n";
-                std::cout << raport(server_address, local_address, "Wypisuje karty\r\n");
             }
             if("tricks" == message){
                 print_trick_history();
             }
-            // jeśli przyszło polecenie dołożenia karty wysyłam komunikat trick
-            if(0){
-
+            if(/*sprawdzam czy wiadomość jest próbą wysłania poprawnej karty*/){
+                std::cout << "Wysyłem poprawną kartę\n";
+                // wysyłam kartę
             }
 
         }
@@ -365,61 +480,19 @@ int Klient::run(){
     return 0;
 }
 
-
-// funkcja pozwala na wysyłanie wiadomości do serwera
-// podaje deskryptor gniazda, na który ma zostać wysłana wiadomość
-// przekazanie stringa przez stałą referencję, const informuje, że funkcja nie zmieni wartości stringa
 void Klient::send_message(int socket_fd, const std::string &message){
-    // odczytuje długość stringa
     size_t length = message.length();
-    // wysyłam wiadomość do serwera na podstawie deskryptora gniazda, nie przekazuje żandych flag
-    // metoda .c_str() zwraca wskaźnik na tablicę znaków, która jest przechowywana w stringu
     ssize_t bytes_sent = send(socket_fd, message.c_str(), length, 0);
 
-    // jeśli nie udało się wysłać wiadomości do serwera
     if(bytes_sent == -1){
         std::cerr << "Błąd podczas wysyłania wiadomości\n";
         close(socket_fd);
         exit(1);
     }
-    // pomyślnie wysłano wiadomość do serwera
-    std::cout << "Wysłano wiadomość: " << message << "\n";
-}
-
-// funkcja pozwala na odbieranie wiadomości od serwera
-int Klient::receive_message(int socket_fd){
-
-    // rozmiar bufora
-    const size_t buffer_size = 1024;
-    // tablica znaków, w której zostanie zapisana wiadomość
-    char buffer[buffer_size];
-
-    // odbieranie wiadomości od serwera
-    // zwraca liczbę otrzymanych bajtów
-    // buffer - wskaźnik na tablicę znaków, w której zostanie zapisana wiadomość
-    // odejumjemu 1 od rozmiaru bufora, żeby zostawić miejsce na terminalne zero
-    ssize_t bytes_received = recv(socket_fd, buffer, buffer_size - 1, 0);
-
-    // nie udąło się załadować wiadomości
-    if(bytes_received == -1){
-        std::cerr << "Błąd podczas odbierania wiadomości\n";
-        close(socket_fd);
-        exit(1);
-    
-    // serwer zamknął połączenie
-    } else if (bytes_received == 0){
-        std::cerr << "Serwer zamknął połączenie\n";
-        close(socket_fd);
-        return 1;
+    if(isBot){
+        raport(getLocalAddress(socket_fd), getServerAddress(socket_fd), message);
     }
-
-    // dodajemy terminalne zero na końcu otrzymanej wiadomości
-    buffer[bytes_received] = '\0';
-    std::cout << "Otrzymano wiadomość: " << buffer << "\n";
-    return 0;
 }
-
-
 
 
 // funkcja nawiązująca połączenie przez klienta

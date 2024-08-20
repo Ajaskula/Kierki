@@ -16,7 +16,7 @@
 std::string getCurrentTime();
 std::string getServerAddress(int socket_fd);
 std::string getLocalAddress(int socket_fd);
-std::string raport(const std::string& addr1, const std::string& addr2, const std::string& message);
+void raport(const std::string& addr1, const std::string& addr2, const std::string& message);
 
 enum class Rank { Two, Three, Four, Five, Six, Seven, Eight, Nine, Ten, Jack, Queen, King, Ace, Unknown };
 
@@ -35,6 +35,7 @@ class Card{
         std::string to_string() const;
         Rank getRank() const;
         static Rank string_to_rank(const std::string& rank);
+        void CardsSet::add_cards(const std::string& cards);
 
     private:
         // atrybuty karty
@@ -45,6 +46,8 @@ class Card{
         // metody z konst nie zmieniają stanu obiektu
         std::string rankToString(Rank rank) const;
         std::string colorToString(Color color) const;
+        std::vector<std::string> CardsSet::extract_hand(const std::string& hand);
+
 };
 
 
