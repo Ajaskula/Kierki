@@ -15,6 +15,8 @@
 #define SCORE 6
 #define TOTAL 7
 
+std::string extract_card_list_from_taken(const std::string& message);
+std::vector<std::string> extract_card_vector_from_taken(const std::string& message);
 
 class Klient{
     public:
@@ -33,13 +35,6 @@ class Klient{
         // wypisuje karty, które aktualnie posiada klient
         void print_hand();
         void print_trick_history();
-        bool wait_DEAL = true;
-        bool wait_TOTAl = true;
-        bool wait_SCORE = true;
-        bool wait_first_TRICK = true;
-        bool got_TRICK = false;
-        int current_trick = 1;
-        std::vector<std::string> tricks_taken;
 
     private:
 
@@ -51,13 +46,28 @@ class Klient{
         char position;
         bool isBot;
         CardSet cardSet;
-        int points;
+        std::vector<std::string> tricks_taken;
         int socket_fd;
+        bool wait_DEAL;
+        bool wait_TOTAL;
+        bool wait_SCORE;
+        bool wait_first_TRICK;
+        bool got_TRICK;
+        int current_trick;
 
         // metoday klienta
         int connect_to_server();
         bool is_valid_card(const std::string& card);
         int validate_message(const std::string& message);
+        bool validate_TRICK(const std::string& message);
+        bool validate_TAKEN(const std::string& message);
+        bool validate_WRONG(const std::string& message);
+        bool validate_SCORE(const std::string& message);
+        bool validate_TOTAL(const std::string& message);
+        std::string print_busy_places(const std::string& message);
+        std::string print_dealed_cards(const std::string& message);
+        void print_taken_tricks();
+        void perform_taken(const std::string& message);
 };
 
 #endif // KLIENT_H

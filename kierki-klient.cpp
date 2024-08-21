@@ -1,5 +1,6 @@
 #include "common.h"
 #include "klient.h"
+#include "cards.h"
 
 int main(int argc, char *argv[]){
 

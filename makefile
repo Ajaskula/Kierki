@@ -1,8 +1,8 @@
 CXX = g++
-CXXFLAGS = -std=c++11 -Wall
+CXXFLAGS = -std=c++17 -Wall
 
 # Source files
-SRCS = common.cpp klient.cpp kierki-klient.cpp # kierki-serwer.cpp
+SRCS = cards.cpp common.cpp klient.cpp kierki-klient.cpp # kierki-serwer.cpp
 
 # Object files
 OBJS = $(SRCS:.cpp=.o)

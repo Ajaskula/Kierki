@@ -6,9 +6,11 @@
 #include <regex>
 #include <set>
 #include "klient.h"
+#include "cards.h"
 #include "common.h"
 #include <netdb.h>
 #include <poll.h>
+#include <unordered_map>
 
 int Klient::parseArguments(int argc, char *argv[], std::string& host, uint16_t& port, bool& IPv4, bool& IPv6, char& position, bool& isBot){
     for(int i = 1; i < argc; i++){
@@ -71,7 +73,7 @@ int Klient::parseArguments(int argc, char *argv[], std::string& host, uint16_t& 
 }
 Klient::Klient(const std::string& host, uint16_t port, bool IPv4, bool IPv6,
         char position, bool isBot)
-        : host(host), port(port), IPv4(IPv4), IPv6(IPv6), position(position), isBot(isBot), cardSet(), points(0), trick_history(), socket_fd(0),
+        : host(host), port(port), IPv4(IPv4), IPv6(IPv6), position(position), isBot(isBot), cardSet(), tricks_taken(), socket_fd(0),
         wait_DEAL(true), wait_TOTAL(true), wait_SCORE(true), wait_first_TRICK(true), got_TRICK(false), current_trick(1)
         {}
 Klient::~Klient(){
@@ -210,7 +212,7 @@ bool Klient::validate_DEAL(const std::string& message){
     }
 
     // sprawdzenie czy lista kart jest poprawna
-    if(is_valid_hand(message.substr(6, (message.length - 8))) == false){
+    if(is_valid_hand(message.substr(6, (message.length() - 8))) == false){
         return false;
     }
  
@@ -243,15 +245,15 @@ bool Klient::validate_TRICK(const std::string& message){
     if(!is_valid_card_list(message.substr(7 - (trick_number >= 10), message.length() - 8 - (trick_number >= 10)))){
         return false;
     }
-    vector<string> cards_vec = extract_hand(message.substr(7 - (trick_number >= 10), message.length() - 8 - (trick_number >= 10)));
+    std::vector<std::string> cards_vec = extract_hand(message.substr(7 - (trick_number >= 10), message.length() - 8 - (trick_number >= 10)));
     
     if(cards_vec.size() >= 4){
         return false;
     }
 
     // muszę jeszcze sprawdzić, czy nie posiadam takiej karty jak te wyłożone na stole
-    for(int i = 0; i < cards_vec.size(); i++){
-        if(isCardInSet(string_to_card(cards_vec[i]))){
+    for(std::vector<std::string>::size_type i = 0; i < cards_vec.size(); i++){
+        if(cardSet.isCardInSet(Card::string_to_card(cards_vec[i]))){
             return false;
         }
     }
@@ -260,7 +262,7 @@ bool Klient::validate_TRICK(const std::string& message){
 bool Klient::validate_TAKEN(const std::string& message){
 
     // sprawdzenie długości
-    if(message.length < 17 || message.length > 22){
+    if(message.length() < 17 || message.length() > 22){
         return false;
     }
 
@@ -289,10 +291,10 @@ bool Klient::validate_TAKEN(const std::string& message){
     if(!is_valid_card_list(message.substr(7 - (trick_number >= 10), message.length() - 9 - (trick_number >= 10)))){
         return false;
     }
-    vector<string> cards_vec = extract_hand(message.substr(7 - (trick_number >= 10), message.length() - 9 - (trick_number >= 10)));
+    std::vector<std::string> cards_vec = extract_hand(message.substr(7 - (trick_number >= 10), message.length() - 9 - (trick_number >= 10)));
     int in_my_hand = 0;
-    for(int i = 0; i < cards_vec.size(); i++){
-        if(isCardInSet(string_to_card(cards_vec[i]))){
+    for(std::vector<std::string>::size_type i = 0; i < cards_vec.size(); i++){
+        if(cardSet.isCardInSet(Card::string_to_card(cards_vec[i]))){
             in_my_hand++;
         }
     }
@@ -334,7 +336,7 @@ bool Klient::validate_WRONG(const std::string& message){
     return true;
 }
 
-bool validate_SCORE(const std::string& message){
+bool Klient::validate_SCORE(const std::string& message){
 
     const std::regex pattern(R"(SCORE[NSEW]\d+[NSEW]\d+[NSEW]\d+[NSEW]\d+\r\n)");
     if (!std::regex_match(message, pattern)) {
@@ -344,7 +346,7 @@ bool validate_SCORE(const std::string& message){
     std::unordered_map<char, int> seat_count = {{'N', 0}, {'S', 0}, {'E', 0}, {'W', 0}};
 
     // Przejdź przez ciąg i zlicz wystąpienia liter N, S, E, W
-    for (char ch : input) {
+    for (char ch : message) {
         if (seat_count.find(ch) != seat_count.end()) {
             seat_count[ch]++;
         }
@@ -360,7 +362,7 @@ bool validate_SCORE(const std::string& message){
     return true;
 }
 
-bool validate_TOTAL(const std::string& message){
+bool Klient::validate_TOTAL(const std::string& message){
 
     const std::regex pattern(R"(TOTAL[NSEW]\d+[NSEW]\d+[NSEW]\d+[NSEW]\d+\r\n)");
     if (!std::regex_match(message, pattern)) {
@@ -370,7 +372,7 @@ bool validate_TOTAL(const std::string& message){
     std::unordered_map<char, int> seat_count = {{'N', 0}, {'S', 0}, {'E', 0}, {'W', 0}};
 
     // Przejdź przez ciąg i zlicz wystąpienia liter N, S, E, W
-    for (char ch : input) {
+    for (char ch : message) {
         if (seat_count.find(ch) != seat_count.end()) {
             seat_count[ch]++;
         }
@@ -448,13 +450,13 @@ std::vector<Card> cards_to_set(const std::string& hand) {
 // wyświetla historię wziętych lew
 void Klient::print_trick_history(){
     std::cout << "Historia wziętych lew: ";
-    for(const std::string& trick : trick_history){
+    for(const std::string& trick : tricks_taken){
         std::cout << trick << " ";
     }
     std::cout << "\n";
 }
 std::string Klient::print_busy_places(const std::string& message){
-    std::busy_places;;
+    std::string busy_places;;
     for(std::string::size_type i = 4; i < message.length() - 2; i++){
         busy_places += message[i];
         // pod warunkiem, że nie jest to ostatni znak
@@ -466,8 +468,8 @@ std::string Klient::print_busy_places(const std::string& message){
 }
 std::string Klient::print_dealed_cards(const std::string& message){
     std::string dealed_cards;
-    std::vector<string> cards_vec = extract_hand(const std::string& hand);
-    for(int i = 0; i < cards_vec.size(); i++){
+    std::vector<std::string> cards_vec = extract_hand(message);
+    for(std::vector<std::string>::size_type i = 0; i < cards_vec.size(); i++){
         dealed_cards += cards_vec[i];
         if(i != cards_vec.size() - 1){
             dealed_cards += ", ";
@@ -477,8 +479,8 @@ std::string Klient::print_dealed_cards(const std::string& message){
 }
 // wypisuje karty na ręku
 void Klient::print_hand(){
+    std::string hand;
     for(const Card& card : cardSet.cards){
-        std::string hand;
         hand+= card.to_string() + ", ";
     }
     hand = hand.substr(0, hand.length() - 2);
@@ -638,18 +640,18 @@ std::string convert_total_message(const std::string& message) {
 
     return result.str();
 }
-void::Klient::perform_taken(const std::string& message){
+void Klient::perform_taken(const std::string& message){
     
     // jeśli ja biorę lewę to dodaje do wziętę karty do historii lew
     std::string card_list = extract_card_list_from_taken(message);
     if(position == message[message.length() - 3]){
         // TODO dołóż kartę do historii lew
-        trick_history.push_back(card_list);
+        tricks_taken.push_back(card_list);
     }
-    vector<std::string> card_vector = extract_card_vector_from_taken(message);
+    std::vector<std::string> card_vector = extract_card_vector_from_taken(message);
     // usuwam z ręki kartę którą wziąłem
     for(std::string card : card_vector){
-        cardSet.removeCard(string_to_card(card));
+        cardSet.removeCard(Card::string_to_card(card));
     }
 
 }
@@ -730,7 +732,7 @@ int Klient::run(){
             }else if(bytes_received == 0){
                 std::cerr << "Serwer zamknął połączenie z klientem\n";
                 close(socket_fd);
-                if(wait_TOTAl || wait_SCORE){
+                if(wait_TOTAL || wait_SCORE){
                     std::cout<< "rozgrywka zakończona nieprawidłowo\n";
                     return 1;
                 }else{
@@ -748,7 +750,7 @@ int Klient::run(){
                         raport(server_address, local_address, message);
                     }
                     // jeśli jestem na etapie oczekiwania na wiadomość DEAL lub BUSY
-                    if(wait_for_DEAL){
+                    if(wait_DEAL){
                         if(validate_message(message) == BUSY){
                             if(!isBot){
                                 std::cout << "Place busy, list of busy places received: " + print_busy_places(message) + ".\n";
@@ -756,13 +758,13 @@ int Klient::run(){
 
                         }else if(validate_message(message) == DEAL){
                             if(!isBot){
-                                std::cout << "New deal " + message[4] + ": staring place " + message[5] + ", your cards: " + print_dealed_cards(message.substr(6, message.length() - 8)) +".\n"
+                                std::cout << "New deal " << message[4] << ": staring place " << message[5] << ", your cards: " << print_dealed_cards(message.substr(6, message.length() - 8)) <<".\n";
                             }
                             // dodaje karty do tali
                             cardSet.add_cards(message.substr(6, message.length() - 8));
                             wait_DEAL = false;
                             wait_SCORE = true;
-                            wait_TOTAl = true;
+                            wait_TOTAL = true;
                             wait_first_TRICK = true;
                             got_TRICK = false;
                             current_trick = 1;
@@ -775,12 +777,12 @@ int Klient::run(){
 
                             // wypisuje instrukcję dla zawodnika
                             if(!isBot){
-                                std::cout << "Trick: (" + curr_trick + ") " + extract_cards_from_TRICK(message) + "\n";
+                                std::cout << "Trick: (" << current_trick << ") " + extract_cards_from_TRICK(message) + "\n";
                                 std::cout << "Available: " + cardSet.print_cards_on_hand() + "\n";
                             }else{
                                 
                                 Card card = cardSet.get_card_of_color(get_first_card_color(message));
-                                std::string to_send = "TRICK" + std::to_string(current_trick) + card.rankToString(card.getRank())+ card.getColor() + "\r\n";
+                                std::string to_send = "TRICK" + std::to_string(current_trick) + card.rank_to_string(card.getRank()) + card.getColor() + "\r\n";
                                 send_message(socket_fd, to_send);
                             }
                         }else if(validate_message(message) == TAKEN){
@@ -791,12 +793,12 @@ int Klient::run(){
                                     std::cout << convert_taken_message(message) << "\n";
                                 }
                                 //TODO implement perform TAKEN (jeśli ja biorę lewę to biorę, ale dodatkowo usuwam na pewno kartę z ręki)
-                                curr_trick++;
+                                current_trick++;
                                 got_TRICK = false;
                             
                             }else if(validate_message(message) == WRONG){
                                 if(!isBot){
-                                    std::cout << "Wrong message received in trick "+ message[5] +".\n";
+                                    std::cout << "Wrong message received in trick " << message[5] << ".\n";
                                 }
                             }
                     
