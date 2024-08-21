@@ -4,7 +4,6 @@
 Card::Card(char color, Rank rank) : color(color), rank(rank) {
 }
 Card::~Card(){
-    std::cout << "Instancja karty została zniszczona\n";
 }
 Rank Card::getRank() const {
     return rank;

@@ -190,12 +190,13 @@ std::string convert_total_message(const std::string& message) {
     return result.str();
 }
 std::string extract_card_list_from_taken(const std::string& message) {
-    // Regularne wyrażenie do dopasowania komunikatu TAKEN
-    std::regex pattern(R"(TAKEN\d+((?:10|[2-9]|[JQKA])[HDCS]+)([NEWS])$)");
+    // Regularne wyrażenie do dopasowania komunikatu TAKEN, uwzględniając \r\n na końcu
+    std::regex pattern(R"(TAKEN\d+((?:10|[2-9]|[JQKA])[HDCS]+)([NEWS])\r\n$)");
     std::smatch matches;
-
+    std::cout << "FIXME: w extract_card_list message to " << message << std::endl;
     if (std::regex_search(message, matches, pattern)) {
         std::string card_list = matches[1].str(); // Wyciągamy listę kart
+        std::cout << "FIXME: w extract_card_list" << card_list << std::endl;
         std::string formatted_list;
         
         // Przetwarzanie kart i formatowanie listy
@@ -212,6 +213,7 @@ std::string extract_card_list_from_taken(const std::string& message) {
 
     return ""; // Zwracamy pusty string, jeśli komunikat nie pasuje do wzorca
 }
+
 
 std::string convert_score_message(const std::string& message) {
     // Tworzymy wynikowy strumień tekstowy
