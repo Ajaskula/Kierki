@@ -13,12 +13,21 @@ class Card{
     public:
         Card(char color, Rank rank);
         ~Card();
-        char getColor() const;
+        // return rank of the card
         Rank getRank() const;
-        static Rank string_to_rank(const std::string& rank);
-        std::string rank_to_string(Rank rank) const;
-        static Card string_to_card(const std::string& card);
-        std::string to_string() const;
+        // return color of the card
+        char getColor() const;
+        // return string representation of the rank
+        std::string rankToString(Rank rank) const;
+        // return rank of the card from string
+        static Rank stringToRank(const std::string& rank);
+        // return card from string
+        static Card stringToCard(const std::string& card);
+        // return string representation of the card
+        std::string toString() const;
+        static std::vector<std::string> extractCardsVectorFromCardsStringStr(const std::string& hand);
+        static bool isStringValidCard(const std::string& card);
+        static std::vector<Card> extractCardsVectorFromCardsString(const std::string& hand);
 
     private:
         char color;
@@ -29,23 +38,23 @@ class CardSet{
     public:
         CardSet(bool fullDeck = false);
         ~CardSet();
-        void addCard(Card card);
-        void addCards(const std::string& cards);
-        void removeCard(Card card);
-        Card getCard() const;
-        int getSize() const;
-        std::vector<Card> cards;
+        // return list representation of the cards on hand
+        std::string getCardsOnHand();
+        // return card of the given color or first card if color is not given
+        // if there is no card of the given color, return first card
+        Card getCardOfColor(char color = '0');
+        // return true if the card is in the set
+        // return false otherwise
         bool isCardInSet(const Card& card) const;
-        void add_cards(const std::string& cards);
-        std::string print_cards_on_hand();
-        Card get_card_of_color(char color = '0');
-        // std::vector<std::string> extract_hand(const std::string& hand);
+        //add card to the set
+        void addCard(Card card);
+        // remove card from the set
+        void removeCard(Card card);
+        // add to the set cards from the string
+        void addCardsFromCardsString(const std::string& cards);
     private:
+        // initialize full deck of cards
         void initializeFullDeck();
+        std::vector<Card> cards;
 };
-
-
-
-
-
 #endif

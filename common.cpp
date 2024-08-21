@@ -1,55 +1,17 @@
 #include "common.h"
 
-std::vector<std::string> extract_hand(const std::string& hand) {
-    std::vector<std::string> cards; // Wektor do przechowywania kart
-    size_t i = 0;
-    size_t hand_length = hand.length();
-
-    while (i < hand_length) {
-        std::string card;
-
-        // Sprawdzenie, czy karta to "10" + kolor (3 znaki)
-        if (i + 2 < hand_length && hand.substr(i, 2) == "10") {
-            card = hand.substr(i, 3); // Wyodrębnij "10X"
-            i += 3;
-        } else {
-            // Każda inna karta to jeden znak liczbowy + jeden znak koloru (2 znaki)
-            card = hand.substr(i, 2); // Wyodrębnij "VX"
-            i += 2;
-        }
-
-        // Dodaj kartę do wektora
-        cards.push_back(card);
-    }
-
-    return cards; // Zwróć wektor kart
-}
-
-
-
-// funkcja, zwracająca aktualny czas w formacie ISO 8601
-std::string getCurrentTime() {
-    // Pobranie aktualnego czasu
+std::string get_current_time() {
     auto now = std::chrono::system_clock::now();
-
-    // Konwersja do czasu kalendarzowego
     std::time_t now_time = std::chrono::system_clock::to_time_t(now);
-
-    // Konwersja do struktury tm dla lokalnego czasu
     std::tm local_time = *std::localtime(&now_time);
-
-    // Wyciągnięcie milisekund
     auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
-
-    // Użycie stringstream do stworzenia formatowanego stringa
     std::ostringstream oss;
     oss << std::put_time(&local_time, "%Y-%m-%dT%H:%M:%S")    // Czas bez milisekund
         << '.' << std::setw(3) << std::setfill('0') << now_ms.count();  // Milisekundy
 
     return oss.str();
 }
-
-std::string getServerAddress(int socket_fd) {
+std::string get_server_address(int socket_fd) {
     struct sockaddr_storage addr;
     socklen_t addr_len = sizeof(addr);
 
@@ -79,8 +41,7 @@ std::string getServerAddress(int socket_fd) {
 
     return server_address;
 }
-// zwraca lokalny adres gniazda
-std::string getLocalAddress(int socket_fd) {
+std::string get_local_address(int socket_fd) {
     struct sockaddr_storage addr;
     socklen_t addr_len = sizeof(addr);
 
@@ -110,7 +71,237 @@ std::string getLocalAddress(int socket_fd) {
     return local_address;
 }
 void raport(const std::string& addr1, const std::string& addr2, const std::string& message){
-    std::string str =  "[" + addr1 + "," + addr2 +","+ getCurrentTime() + "] " + message;
+    std::string str =  "[" + addr1 + "," + addr2 +","+ get_current_time() + "] " + message;
     size_t length = str.length();
     std::cout.write(str.c_str(), length);
+}
+
+bool is_string_correct_card_list(const std::string& hand) {
+    // zbiór do przechowywanie unikalnych kart
+    std::set<std::string> unique_cards; // Zbiór do przechowywania unikalnych kart
+
+    // przetwarzanie karty po karcie
+    size_t i = 0;
+    size_t hand_length = hand.length();
+    // int card_count = 0;
+
+    // dopóki nie przejdę przez cały string
+    while (i < hand_length) {
+        std::string card;
+
+        if (i + 2 < hand_length && hand.substr(i, 2) == "10") {
+            card = hand.substr(i, 3); // Karta to "10X"
+            i += 3;
+        } else if (i + 1 < hand_length) {
+            card = hand.substr(i, 2); // Karta to "VX"
+            i += 2;
+        } else {
+            return false; // Niekompletna karta na końcu stringa
+        }
+
+        if (!Card::isStringValidCard(card)) {
+            return false; // Znaleziono niepoprawną kartę
+        }
+
+        if (!unique_cards.insert(card).second) {
+            return false; // Znaleziono duplikat
+        }
+    }
+    return true;
+}
+
+bool is_valid_request_to_send_card(const std::string& input) {
+    // Wyrażenie regularne do sprawdzenia formatu !karta
+    std::regex pattern(R"(^!(10|[2-9]|[JQKA])[CSDH]$)");
+
+    // Sprawdzenie, czy ciąg pasuje do wzorca
+    return std::regex_match(input, pattern);
+}
+
+std::string extract_cards_from_TRICK(const std::string& input) {
+    // Wyrażenie regularne do zidentyfikowania części z kartami
+    std::regex pattern(R"(TRICK\d+((?:\d{1,2}|[JQKA])[CSDH]+)\r\n)");
+    std::smatch matches;
+
+    // Sprawdź, czy ciąg pasuje do wzorca i wyciągnij listę kart
+    if (std::regex_search(input, matches, pattern) && matches.size() > 1) {
+        std::string card_list = matches[1].str();
+        std::string result;
+
+        // Iteruj przez listę kart i formatuj je poprawnie
+        for (size_t i = 0; i < card_list.size();) {
+            std::string card;
+
+            // Sprawdź, czy karta to "10"
+            if (i + 1 < card_list.size() && card_list[i] == '1' && card_list[i + 1] == '0') {
+                card = card_list.substr(i, 3); // karta "10X"
+                i += 3;
+            } else {
+                card = card_list.substr(i, 2); // karta "VX"
+                i += 2;
+            }
+
+            // Dodaj kartę do wyniku
+            if (!result.empty()) {
+                result += ", ";
+            }
+            result += card;
+        }
+
+        return result;
+    }
+
+    return ""; // Zwróć pusty ciąg, jeśli format nie pasuje
+}
+std::string get_busy_places_from_BUSY(const std::string& message){
+    std::string busy_places;;
+    for(std::string::size_type i = 4; i < message.length() - 2; i++){
+        busy_places += message[i];
+        // pod warunkiem, że nie jest to ostatni znak
+        if(i != message.length() - 3){
+            busy_places += ", ";
+        }
+    }
+    return busy_places;
+}
+std::string convert_total_message(const std::string& message) {
+    // Tworzymy wynikowy strumień tekstowy
+    std::ostringstream result;
+
+    // Dodajemy nagłówek
+    result << "The total scores are:\n";
+
+    // Usuwamy prefiks "TOTAL" i końcowe "\r\n"
+    std::string clean_message = message.substr(5, message.length() - 7);
+
+    // Przetwarzamy poszczególne pary <miejsce><punkty>
+    for (size_t i = 0; i < clean_message.length(); i += 3) {
+        std::string position = clean_message.substr(i, 1);
+        std::string points = clean_message.substr(i + 1, 2);  // Pobieramy dokładnie 2 znaki
+
+        // Usuwamy wiodące zera z punktów
+        int numeric_points = std::stoi(points);  // Konwertujemy na liczbę, co automatycznie usunie wiodące zera
+        points = std::to_string(numeric_points); // Konwertujemy z powrotem na string
+
+        // Dodajemy miejsce i punkty do wynikowego komunikatu
+        result << position << " | " << points << "\n";
+    }
+
+    return result.str();
+}
+std::string extract_card_list_from_taken(const std::string& message) {
+    // Regularne wyrażenie do dopasowania komunikatu TAKEN
+    std::regex pattern(R"(TAKEN\d+((?:10|[2-9]|[JQKA])[HDCS]+)([NEWS])$)");
+    std::smatch matches;
+
+    if (std::regex_search(message, matches, pattern)) {
+        std::string card_list = matches[1].str(); // Wyciągamy listę kart
+        std::string formatted_list;
+        
+        // Przetwarzanie kart i formatowanie listy
+        for (size_t i = 0; i < card_list.length(); i += 2) {
+            if (i > 0) {
+                formatted_list += ", ";
+            }
+            formatted_list += card_list.substr(i, (card_list[i] == '1') ? 3 : 2);
+            i += (card_list[i] == '1'); // Jeśli karta to "10", zwiększamy indeks o 1 więcej
+        }
+
+        return formatted_list;
+    }
+
+    return ""; // Zwracamy pusty string, jeśli komunikat nie pasuje do wzorca
+}
+
+std::string convert_score_message(const std::string& message) {
+    // Tworzymy wynikowy strumień tekstowy
+    std::ostringstream result;
+
+    // Dodajemy nagłówek
+    result << "The scores are:\n";
+
+    // Usuwamy prefiks "SCORE"
+    std::string clean_message = message.substr(5, message.length() - 7);
+
+    // Przetwarzamy poszczególne pary <miejsce><punkty>
+    for (size_t i = 0; i < clean_message.length(); i += 3) {
+        std::string position = clean_message.substr(i, 1);
+        std::string points = clean_message.substr(i + 1, 2);  // Pobieramy dokładnie 2 znaki
+
+        // Usuwamy wiodące zera z punktów
+        int numeric_points = std::stoi(points);  // Konwertujemy na liczbę, co automatycznie usunie wiodące zera
+        points = std::to_string(numeric_points); // Konwertujemy z powrotem na string
+
+        // Dodajemy miejsce i punkty do wynikowego komunikatu
+        result << position << " | " << points << "\n";
+    }
+
+    return result.str();
+}
+std::vector<std::string> extract_card_vector_from_taken(const std::string& message) {
+    // Regularne wyrażenie do dopasowania komunikatu TAKEN
+    std::regex pattern(R"(TAKEN\d+((?:10|[2-9]|[JQKA])[HDCS]+)([NEWS])$)");
+    std::smatch matches;
+    std::vector<std::string> card_vector;
+
+    if (std::regex_search(message, matches, pattern)) {
+        std::string card_list = matches[1].str(); // Wyciągamy listę kart
+
+        // Przetwarzanie kart i dodawanie ich do wektora
+        for (size_t i = 0; i < card_list.length(); i += 2) {
+            std::string card = card_list.substr(i, (card_list[i] == '1') ? 3 : 2);
+            card_vector.push_back(card);
+            i += (card_list[i] == '1'); // Jeśli karta to "10", zwiększamy indeks o 1 więcej
+        }
+    }
+
+    return card_vector;
+}
+char get_first_card_color_from_TRICK(const std::string& message) {
+    // Zaktualizowane wyrażenie regularne, aby wyodrębnić kolor pierwszej karty
+    std::regex pattern(R"(TRICK\d+(?:\d{1,2}|[JQKA])([CSDH]).*\r\n)");
+    std::smatch matches;
+
+    if (std::regex_search(message, matches, pattern)) {
+        return matches[1].str()[0]; // matches[1] to kolor pierwszej karty
+    }
+
+    return '0'; // Zwraca '0', jeśli nie znaleziono dopasowania
+}
+std::string convert_taken_message(const std::string& taken_message) {
+    // Ignorujemy końcowe \r\n, usuwamy "TAKEN"
+    std::string clean_message = taken_message.substr(5, taken_message.length() - 7);
+
+    // Wyciąganie numeru lewy
+    size_t start = 0;
+    size_t end = clean_message.find_first_not_of("0123456789");
+    std::string trick_number = clean_message.substr(start, end - start);
+
+    // Wyciąganie listy kart
+    start = end;
+    end = clean_message.find_first_of("NSWE", start);
+    std::string card_list = clean_message.substr(start, end - start);
+    
+    // Formatowanie listy kart
+    std::string formatted_card_list = format_card_list(card_list);
+
+    // Wyciąganie pozycji gracza
+    std::string player_position = clean_message.substr(end);
+
+    // Tworzenie wynikowego komunikatu
+    std::ostringstream result;
+    result << "A trick " << trick_number << " is taken by " << player_position
+           << ", cards " << formatted_card_list << ".";
+
+    return result.str();
+}
+std::string format_card_list(const std::string& card_list) {
+    std::ostringstream formatted;
+    for (size_t i = 0; i < card_list.length(); i += 2) {
+        if (i > 0) {
+            formatted << ", ";
+        }
+        formatted << card_list.substr(i, 2);  // Bierzemy dwuznakową kartę
+    }
+    return formatted.str();
 }

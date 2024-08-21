@@ -1,20 +1,18 @@
 #include "cards.h"
+#include <regex>
 
 Card::Card(char color, Rank rank) : color(color), rank(rank) {
 }
 Card::~Card(){
     std::cout << "Instancja karty została zniszczona\n";
 }
-// return rank of the card
 Rank Card::getRank() const {
     return rank;
 }
-// return color of the card
 char Card::getColor() const {
     return color;
 }
-// return string representation of the rank
-std::string Card::rank_to_string(Rank rank) const {
+std::string Card::rankToString(Rank rank) const {
     switch(rank){
         case Rank::Two:
             return "2";
@@ -46,9 +44,7 @@ std::string Card::rank_to_string(Rank rank) const {
             return "Unknown";
     }
 }
-
-// return rank of the card from string
-Rank Card::string_to_rank(const std::string& rank) {
+Rank Card::stringToRank(const std::string& rank) {
     if(rank == "2"){
         return Rank::Two;
     }else if(rank == "3"){
@@ -79,26 +75,85 @@ Rank Card::string_to_rank(const std::string& rank) {
         return Rank::Unknown;
     }
 }
-
-// return card from string
-Card Card::string_to_card(const std::string& card){
-    return Card(card[card.length()-1], Card::string_to_rank(card.substr(0, card.length() - 1)));
+Card Card::stringToCard(const std::string& card){
+    return Card(card[card.length()-1], Card::stringToRank(card.substr(0, card.length() - 1)));
 }
-// return string representation of the card
-std::string Card::to_string() const {
-    return rank_to_string(rank) + color;
+std::string Card::toString() const {
+    return rankToString(rank) + color;
+}
+std::vector<std::string> Card::extractCardsVectorFromCardsStringStr(const std::string& hand) {
+    std::vector<std::string> cards;
+    size_t i = 0;
+    size_t hand_length = hand.length();
+
+    while (i < hand_length) {
+        std::string card;
+
+        // Sprawdzenie, czy karta to "10" + kolor (3 znaki)
+        if (i + 2 < hand_length && hand.substr(i, 2) == "10") {
+            card = hand.substr(i, 3); // Wyodrębnij "10X"
+            i += 3;
+        } else {
+            // Każda inna karta to jeden znak liczbowy + jeden znak koloru (2 znaki)
+            card = hand.substr(i, 2); // Wyodrębnij "VX"
+            i += 2;
+        }
+
+        // Dodaj kartę do wektora
+        cards.push_back(card);
+    }
+
+    return cards; // Zwróć wektor kart
+}
+bool Card::isStringValidCard(const std::string& card){
+    static const std::regex card_regex("^(10|[2-9]|[JQKA])[CDHS]$");
+    return std::regex_match(card, card_regex);
+}
+std::vector<Card> Card::extractCardsVectorFromCardsString(const std::string& hand) {
+    std::vector<Card> card_set;
+
+    size_t i = 0;
+    size_t hand_length = hand.length();
+
+    while (i < hand_length) {
+        std::string rank_str;
+        char color;
+
+        if (i + 2 < hand_length && hand.substr(i, 2) == "10") {
+            rank_str = "10"; // Ranga to "10"
+            color = hand[i + 2]; // Kolor jest na pozycji 3 (indeks i + 2)
+            i += 3;
+        } else if (i + 1 < hand_length) {
+            rank_str = hand.substr(i, 1); // Ranga to jeden znak (2-9, J, Q, K, A)
+            color = hand[i + 1]; // Kolor jest na pozycji 2 (indeks i + 1)
+            i += 2;
+        } else {
+            throw std::invalid_argument("Niekompletna karta w stringu");
+        }
+
+        Rank rank = Card::stringToRank(rank_str);
+        card_set.push_back(Card(color, rank));
+    }
+
+    return card_set;
 }
 
 
-std::string CardSet::print_cards_on_hand(){
+CardSet::CardSet(bool fullDeck) : cards() {
+    if(fullDeck){
+        initializeFullDeck();
+    }
+}
+CardSet::~CardSet(){}
+
+std::string CardSet::getCardsOnHand(){
     std::string cards_on_hand = "";
     for(auto card : cards){
-        cards_on_hand += card.to_string() + ", ";
+        cards_on_hand += card.toString() + ", ";
     }
     return cards_on_hand.substr(0, cards_on_hand.length() - 2);
 }
-
-Card CardSet::get_card_of_color(char color){
+Card CardSet::getCardOfColor(char color){
     for(auto card : cards){
         if(color == '0' || card.getColor() == color){
             return card;
@@ -109,13 +164,6 @@ Card CardSet::get_card_of_color(char color){
     }
     return Card('0', Rank::Unknown);
 }
-
-// konstruktor talii z pełnym deckiem
-CardSet::CardSet(bool fullDeck) : cards() {
-    if(fullDeck){
-        initializeFullDeck();
-    }
-}
 bool CardSet::isCardInSet(const Card& card) const {
     for(auto c : cards){
         if(c.getColor() == card.getColor() && c.getRank() == card.getRank()){
@@ -124,35 +172,17 @@ bool CardSet::isCardInSet(const Card& card) const {
     }
     return false;
 }
-
-
-CardSet::~CardSet(){
-    std::cout << "Instancja talii została zniszczona\n";
-}
-
 void CardSet::initializeFullDeck(){
     char colors[] = {'H', 'D', 'C', 'S'};
     for(int i = 0; i < 4; i++){
         for(int j = 0; j < 13; j++){
-            cards.push_back(Card(colors[i], static_cast<Rank>(j)));
+            addCard(Card(colors[i], static_cast<Rank>(j)));
         }
     }
 }
-
-// dodaje kartę do zbioru kart
 void CardSet::addCard(Card card){
     cards.push_back(card);
 }
-
-void CardSet::add_cards(const std::string& cards){
-    std::vector<std::string> extracted_cards = extract_hand(cards);
-    for(auto card : extracted_cards){
-        addCard(Card(card[card.length()-1], Card::string_to_rank(card.substr(0, card.length() - 1))));
-    }
-}
-
-
-// usuwa kartę z talii
 void CardSet::removeCard(Card card){
     for(auto it = cards.begin(); it != cards.end(); it++){
         if(it->getColor() == card.getColor() && it->getRank() == card.getRank()){
@@ -161,12 +191,9 @@ void CardSet::removeCard(Card card){
         }
     }
 }
-
-// zwraca ostatnią kartę z talii
-Card CardSet::getCard() const {
-    return cards.back();
-}
-// zwraca rozmiar kolekcji kart
-int CardSet::getSize() const {
-    return cards.size();
+void CardSet::addCardsFromCardsString(const std::string& cards){
+    std::vector<std::string> extracted_cards = Card::extractCardsVectorFromCardsStringStr(cards);
+    for(auto card : extracted_cards){
+        addCard(Card(card[card.length()-1], Card::stringToRank(card.substr(0, card.length() - 1))));
+    }
 }
