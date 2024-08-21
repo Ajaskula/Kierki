@@ -69,7 +69,6 @@ int Klient::parseArguments(int argc, char *argv[], std::string& host, uint16_t& 
     
     return 0;
 }
-
 Klient::Klient(const std::string& host, uint16_t port, bool IPv4, bool IPv6,
         char position, bool isBot)
         : host(host), port(port), IPv4(IPv4), IPv6(IPv6), position(position), isBot(isBot), cardSet(), points(0), trick_history(), socket_fd(0),
@@ -86,15 +85,6 @@ bool is_valid_card(const std::string& card){
     static const std::regex card_regex("^(10|[2-9]|[JQKA])[CDHS]$");
     return std::regex_match(card, card_regex);
 }
-// funkcja wypisuje karty, które klient, aktualnie ma na ręce
-void Klient::print_hand(){
-    std::cout << "Karty na ręce: ";
-    for(const Card& card : cardSet.cards){
-        std::cout << card.to_string() << " ";
-    }
-    std::cout << "\n";
-}
-
 // sprawdzam czy otrzymane karty są poprawne
 bool is_valid_hand(const std::string& hand) {
     // zbiór do przechowywanie unikalnych kart
@@ -169,7 +159,6 @@ bool is_valid_card_list(const std::string& hand) {
     }
     return true;
 }
-
 bool Klient::validate_BUSY(const std::string& message){
     if(message.length() > 10 || message.length() < 7){
         return false;
@@ -227,7 +216,6 @@ bool Klient::validate_DEAL(const std::string& message){
  
     return true;
 }
-
 bool Klient::validate_TRICK(const std::string& message){
     if(message.length() < 8 || message.length() > 18){
         return false;
@@ -487,6 +475,23 @@ std::string Klient::print_dealed_cards(const std::string& message){
     }
     return dealed_cards;
 }
+// wypisuje karty na ręku
+void Klient::print_hand(){
+    for(const Card& card : cardSet.cards){
+        std::string hand;
+        hand+= card.to_string() + ", ";
+    }
+    hand = hand.substr(0, hand.length() - 2);
+    hand += "\n";
+    std::cout << hand;
+}
+void Klient::print_taken_tricks(){
+    // std::cout << "Wzięte lewy: ";
+    for(const std::string& trick : tricks_taken){
+        std::cout << trick << "\n";
+    }
+    // std::cout << "\n";
+}
 
 std::string extract_cards_from_TRICK(const std::string& input) {
     // Wyrażenie regularne do zidentyfikowania części z kartami
@@ -544,42 +549,175 @@ char get_first_card_color(const std::string& message) {
     return '0'; // Zwraca '0', jeśli nie znaleziono dopasowania
 }
 
+// Funkcja pomocnicza do dzielenia listy kart
+std::string format_card_list(const std::string& card_list) {
+    std::ostringstream formatted;
+    for (size_t i = 0; i < card_list.length(); i += 2) {
+        if (i > 0) {
+            formatted << ", ";
+        }
+        formatted << card_list.substr(i, 2);  // Bierzemy dwuznakową kartę
+    }
+    return formatted.str();
+}
+
+std::string convert_taken_message(const std::string& taken_message) {
+    // Ignorujemy końcowe \r\n, usuwamy "TAKEN"
+    std::string clean_message = taken_message.substr(5, taken_message.length() - 7);
+
+    // Wyciąganie numeru lewy
+    size_t start = 0;
+    size_t end = clean_message.find_first_not_of("0123456789");
+    std::string trick_number = clean_message.substr(start, end - start);
+
+    // Wyciąganie listy kart
+    start = end;
+    end = clean_message.find_first_of("NSWE", start);
+    std::string card_list = clean_message.substr(start, end - start);
+    
+    // Formatowanie listy kart
+    std::string formatted_card_list = format_card_list(card_list);
+
+    // Wyciąganie pozycji gracza
+    std::string player_position = clean_message.substr(end);
+
+    // Tworzenie wynikowego komunikatu
+    std::ostringstream result;
+    result << "A trick " << trick_number << " is taken by " << player_position
+           << ", cards " << formatted_card_list << ".";
+
+    return result.str();
+}
+std::string convert_score_message(const std::string& message) {
+    // Tworzymy wynikowy strumień tekstowy
+    std::ostringstream result;
+
+    // Dodajemy nagłówek
+    result << "The scores are:\n";
+
+    // Usuwamy prefiks "SCORE"
+    std::string clean_message = message.substr(5, message.length() - 7);
+
+    // Przetwarzamy poszczególne pary <miejsce><punkty>
+    for (size_t i = 0; i < clean_message.length(); i += 3) {
+        std::string position = clean_message.substr(i, 1);
+        std::string points = clean_message.substr(i + 1, 2);  // Pobieramy dokładnie 2 znaki
+
+        // Usuwamy wiodące zera z punktów
+        int numeric_points = std::stoi(points);  // Konwertujemy na liczbę, co automatycznie usunie wiodące zera
+        points = std::to_string(numeric_points); // Konwertujemy z powrotem na string
+
+        // Dodajemy miejsce i punkty do wynikowego komunikatu
+        result << position << " | " << points << "\n";
+    }
+
+    return result.str();
+}
+std::string convert_total_message(const std::string& message) {
+    // Tworzymy wynikowy strumień tekstowy
+    std::ostringstream result;
+
+    // Dodajemy nagłówek
+    result << "The total scores are:\n";
+
+    // Usuwamy prefiks "TOTAL" i końcowe "\r\n"
+    std::string clean_message = message.substr(5, message.length() - 7);
+
+    // Przetwarzamy poszczególne pary <miejsce><punkty>
+    for (size_t i = 0; i < clean_message.length(); i += 3) {
+        std::string position = clean_message.substr(i, 1);
+        std::string points = clean_message.substr(i + 1, 2);  // Pobieramy dokładnie 2 znaki
+
+        // Usuwamy wiodące zera z punktów
+        int numeric_points = std::stoi(points);  // Konwertujemy na liczbę, co automatycznie usunie wiodące zera
+        points = std::to_string(numeric_points); // Konwertujemy z powrotem na string
+
+        // Dodajemy miejsce i punkty do wynikowego komunikatu
+        result << position << " | " << points << "\n";
+    }
+
+    return result.str();
+}
+void::Klient::perform_taken(const std::string& message){
+    
+    // jeśli ja biorę lewę to dodaje do wziętę karty do historii lew
+    std::string card_list = extract_card_list_from_taken(message);
+    if(position == message[message.length() - 3]){
+        // TODO dołóż kartę do historii lew
+        trick_history.push_back(card_list);
+    }
+    vector<std::string> card_vector = extract_card_vector_from_taken(message);
+    // usuwam z ręki kartę którą wziąłem
+    for(std::string card : card_vector){
+        cardSet.removeCard(string_to_card(card));
+    }
+
+}
+std::string extract_card_list_from_taken(const std::string& message) {
+    // Regularne wyrażenie do dopasowania komunikatu TAKEN
+    std::regex pattern(R"(TAKEN\d+((?:10|[2-9]|[JQKA])[HDCS]+)([NEWS])$)");
+    std::smatch matches;
+
+    if (std::regex_search(message, matches, pattern)) {
+        std::string card_list = matches[1].str(); // Wyciągamy listę kart
+        std::string formatted_list;
+        
+        // Przetwarzanie kart i formatowanie listy
+        for (size_t i = 0; i < card_list.length(); i += 2) {
+            if (i > 0) {
+                formatted_list += ", ";
+            }
+            formatted_list += card_list.substr(i, (card_list[i] == '1') ? 3 : 2);
+            i += (card_list[i] == '1'); // Jeśli karta to "10", zwiększamy indeks o 1 więcej
+        }
+
+        return formatted_list;
+    }
+
+    return ""; // Zwracamy pusty string, jeśli komunikat nie pasuje do wzorca
+}
+std::vector<std::string> extract_card_vector_from_taken(const std::string& message) {
+    // Regularne wyrażenie do dopasowania komunikatu TAKEN
+    std::regex pattern(R"(TAKEN\d+((?:10|[2-9]|[JQKA])[HDCS]+)([NEWS])$)");
+    std::smatch matches;
+    std::vector<std::string> card_vector;
+
+    if (std::regex_search(message, matches, pattern)) {
+        std::string card_list = matches[1].str(); // Wyciągamy listę kart
+
+        // Przetwarzanie kart i dodawanie ich do wektora
+        for (size_t i = 0; i < card_list.length(); i += 2) {
+            std::string card = card_list.substr(i, (card_list[i] == '1') ? 3 : 2);
+            card_vector.push_back(card);
+            i += (card_list[i] == '1'); // Jeśli karta to "10", zwiększamy indeks o 1 więcej
+        }
+    }
+
+    return card_vector;
+}
+
 
 int Klient::run(){
 
     socket_fd = connect_to_server();
-    std::string local_address = getLocalAddress(socket_fd);
-    std::string server_address = getServerAddress(socket_fd);
     if(socket_fd == -1){
         std::cerr << "Nie udało się nawiązać połączenia\n";
         return 1;
     }
+    std::string local_address = getLocalAddress(socket_fd);
+    std::string server_address = getServerAddress(socket_fd);
 
     std::string message = std::string("IAM") + position + "\r\n";
     send_message(socket_fd, message);
     
-    struct pollfd fds[2];
-    fds[0].fd = socket_fd;  // socket
-    fds[0].events = POLLIN;
-    fds[1].fd = STDIN_FILENO;  // stdin
-    fds[1].events = POLLIN;
-
-    char buffer[1024];
-    memset(buffer, 0, 1024);
-    size_t buffer_index = 0;
+    struct pollfd fds[2]; fds[0].fd = socket_fd;  fds[0].events = POLLIN; fds[1].fd = STDIN_FILENO;  fds[1].events = POLLIN;
+    char buffer[1024]; memset(buffer, 0, 1024); size_t buffer_index = 0;
 
     while(true){
 
-        for(int i = 0; i < 2; i++){
-            fds[i].revents = 0;
-        }
-
+        for(int i = 0; i < 2; i++){ fds[i].revents = 0; }
         int poll_count = poll(fds, 2, -1); // Czekamy na zdarzenie
-        if (poll_count < 0) {
-            std::cerr << "Poll error" << std::endl;
-            close(socket_fd);
-            return 1;
-        }
+        if (poll_count < 0) {std::cerr << "Poll error" << std::endl;close(socket_fd);return 1;}
 
         // odczytanie wiadomości od serwera
         if(fds[0].revents & POLLIN){
@@ -593,10 +731,10 @@ int Klient::run(){
                 std::cerr << "Serwer zamknął połączenie z klientem\n";
                 close(socket_fd);
                 if(wait_TOTAl || wait_SCORE){
-                    std::cout<< "rozgrywka zakończona przed kończem rozgrywki\n";
+                    std::cout<< "rozgrywka zakończona nieprawidłowo\n";
                     return 1;
                 }else{
-                    std::cout << "rozgrywka zakończona\n";
+                    std::cout << "rozgrywka zakończona poprawnie\n";
                     return 0;
                 }
             }
@@ -631,7 +769,6 @@ int Klient::run(){
                         }
                     }else if(current_trick < 14){
 
-                        // jeśli current trick jest 1 jeden, to mogę dostać TAKEN lub TRICK
                         if(validate_message(message) == TRICK){
                             got_TRICK = true;
                             wait_first_TRICK = false;
@@ -640,61 +777,53 @@ int Klient::run(){
                             if(!isBot){
                                 std::cout << "Trick: (" + curr_trick + ") " + extract_cards_from_TRICK(message) + "\n";
                                 std::cout << "Available: " + cardSet.print_cards_on_hand() + "\n";
-                            // urzytkownik sam wykonuje ruch
                             }else{
                                 
-                                // wykonuje ruch
-                                // dokładam dowolną kartę
                                 Card card = cardSet.get_card_of_color(get_first_card_color(message));
-                                std::string to_send = "TRICK" + std::to_string(current_trick) + card.getColor + card.rankToString(card.getRank()) + "\r\n";
-                                // jeśli nie mam takiego koloru daje dowolną kartę
+                                std::string to_send = "TRICK" + std::to_string(current_trick) + card.rankToString(card.getRank())+ card.getColor() + "\r\n";
                                 send_message(socket_fd, to_send);
                             }
                         }else if(validate_message(message) == TAKEN){
                             
-                            // jeśli nie dostałem jeszcze rzadnego tricka, normalnie performuje taken
-                            if(wait_first_TRICK && !got_TRICK){
-                                // jeśli dostałem już tricka w tej iteracji
+                            // tylko jeśli czekam wciąż na pierwszego tricka
+                            if(wait_first_TRICK || got_TRICK){
+                                if(!isBot){
+                                    std::cout << convert_taken_message(message) << "\n";
+                                }
+                                //TODO implement perform TAKEN (jeśli ja biorę lewę to biorę, ale dodatkowo usuwam na pewno kartę z ręki)
                                 curr_trick++;
-                                // znajduje wśród swoich kart tą, którą ja położyłem na stół
-                                // usuwam ją z talii
-                            }else if(got_TRICK){
-                                // performuje normalnie to co powinienem
-
-                                curr_trick++;
+                                got_TRICK = false;
+                            
+                            }else if(validate_message(message) == WRONG){
+                                if(!isBot){
+                                    std::cout << "Wrong message received in trick "+ message[5] +".\n";
+                                }
                             }
-
-
-                        }else if(validate_message(message) == WRONG){
-                            if(!isBot){
-                                std::cout << "Wrong message received in trick "+ message[5] +".\n";
-                            }
-                            // tutaj chyba nic nie robię
-                        }
                     
                     // tutaj powinienem otrzymać SCORE i TOTAL
                     // tutaj jest okej, bo mogę to otrzymać jedynie gdy curr_trick == 14
-                    }else{
-                        if(validate_message(message) == SCORE){
-                            // w przypadku tej implementacj też chyba nic nie robię
-                            if(!isBot){
+                        }else{
+                            if(validate_message(message) == SCORE){
+                                // w przypadku tej implementacj też chyba nic nie robię
+                                if(!isBot){
+                                    std::cout << convert_score_message(message) << "\n";
+                                }
+                                wait_SCORE = false;
 
+                            }else if(validate_message(message) == TOTAL){
+                                if(!isBot){
+                                    std::cout << convert_total_message(message) << "\n";
+                                }
+                                wait_TOTAL = false;
                             }
-                            wait_SCORE = false;
-
-                        }else if(validate_message(message) == TOTAL){
-                            if(!isBot){
-
+                            if(!wait_TOTAL && !wait_SCORE){
+                                wait_DEAL = true;
                             }
-                            wait_TOTAL = false;
                         }
-                        if(!wait_TOTAL && !wait_SCORE){
-                            wait_DEAL = true;
-                        }
-                    }
                     // otrzymałem faktycznie wiadomość
                     buffer_index = 0;
                     memset(buffer, 0, 1024);
+                    }
                 }
             }
             // jeśli przekroczyłem limit długości wiadomości
@@ -713,11 +842,10 @@ int Klient::run(){
             std::string message;
             std::cin >> message;
             if("cards" == message){
-                std::cout << "Wypisuje karty\n";
                 print_hand();
             }
             if("tricks" == message){
-                print_trick_history();
+                print_taken_tricks();
             }
             if(is_valid_card_format(message)){
                 std::string to_send = "TRICK" + std::to_string(current_trick) + message.substr(1) + "\r\n";
@@ -726,8 +854,6 @@ int Klient::run(){
 
         }
     }
-
-
     return 0;
 }
 
@@ -744,8 +870,6 @@ void Klient::send_message(int socket_fd, const std::string &message){
         raport(getLocalAddress(socket_fd), getServerAddress(socket_fd), message);
     }
 }
-
-// funkcja nawiązująca połączenie przez klienta
 int Klient::connect_to_server(){
 
             std::cout << "Próba połączenia z serwerem " << host << " na porcie " << port << "\n";

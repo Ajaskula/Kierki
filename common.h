@@ -35,6 +35,7 @@ class Card{
         std::string to_string() const;
         Rank getRank() const;
         static Rank string_to_rank(const std::string& rank);
+        Card string_to_card(const std::string& card)
         void CardsSet::add_cards(const std::string& cards);
 
     private:

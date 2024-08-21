@@ -75,7 +75,7 @@ Rank Card::string_to_rank(const std::string& rank) {
 }
 
 std::string Card::to_string() const {
-    return rankToString(rank) + " of " + color;
+    return rankToString(rank) + color;
 }
 Rank Card::getRank() const {
     return rank;
@@ -163,7 +163,7 @@ std::vector<std::string> CardsSet::extract_hand(const std::string& hand) {
         cards.push_back(card);
     }
 
-    return cards; // Zwróć wektor 13 kart
+    return cards; // Zwróć wektor kart
 }
 
 void CardsSet::add_cards(const std::string& cards){

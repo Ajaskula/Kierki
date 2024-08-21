@@ -39,6 +39,7 @@ class Klient{
         bool wait_first_TRICK = true;
         bool got_TRICK = false;
         int current_trick = 1;
+        std::vector<std::string> tricks_taken;
 
     private:
 
@@ -52,7 +53,6 @@ class Klient{
         CardSet cardSet;
         int points;
         int socket_fd;
-        std::vector<std::string> trick_history;
 
         // metoday klienta
         int connect_to_server();
