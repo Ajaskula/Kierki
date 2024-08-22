@@ -94,9 +94,6 @@ bool Klient::isStringValidHandDealed(const std::string& hand) {
             return false; // Znaleziono duplikat
         }
         card_count++;
-        if (card_count > 13) {
-            return false; // Zbyt wiele kart
-        }
     }
     return card_count == 13; // Sprawdzamy, czy przetworzono dokładnie 13 kart
 }
@@ -108,6 +105,7 @@ bool Klient::validateBUSY(const std::string& message){
     if(message.substr(0, 4) != "BUSY"){
         return false;
     }
+
     for(std::string::size_type i = 4; i < message.length() - 2; i++){
         if(message[i] != 'N' && message[i] != 'S' && message[i] != 'E' && message[i] != 'W'){
             return false;
@@ -166,19 +164,30 @@ bool Klient::validateTRICK(const std::string& message){
         std::cout << "FIXME: niepoprawne słowo kluczowe\n";
         return false;
     }
-    if(!(message[5] == '1' && message[6] <= '3' && message[6] >= '0') && !(message[5] >= '1' && message[5] <= '9' && !isdigit(message[6]))){
-        std::cout << "FIXME: niepoprawny numer lewy1\n";
-        return false;
-    }
+
+    // sprawdzam czy numer lewy jest jedno czy dwucyfrowy
     int trick_number = 0;
-    if(message[5] == '1' && isdigit(message[6])){
-        trick_number = 10;
-        trick_number += message[6] - '0';
+    if(( message[7] >= '1' && message[7] <= '9') || message[7] == 'J' || message[7] == 'Q' || message[7] == 'K' || message[7] == 'A' || message[7] == '\r'){
+        
+        if(isdigit(message[5]) && isdigit(message[6])){
+            trick_number = 10 * (message[5] - '0');
+            trick_number += message[6] - '0';
+
+        }else{
+            return false;
+        }
+
+    // nie 
     }else{
-        trick_number = message[5] - '0';
+        if(isdigit(message[5])){
+            trick_number = message[5] - '0';
+        }else{
+            return false;
+        }
     }
+
     if(trick_number != current_trick){
-        std::cout << "FIXME: niepoprawny numer lewy2\n";
+        std::cout << "FIXME: niepoprawny numer lewy\n";
         return false;
     }
 
@@ -218,33 +227,42 @@ bool Klient::validateTAKEN(const std::string& message){
     }
 
     // sprawdzenie numeru lewy
-    if(!(message[5] == '1' && message[6] <= '3' && message[6] >= '0') && !(message[5] >= '1' && message[5] <= '9' && !isdigit(message[6]))){
-        std::cout << "FIXME: niepoprawny numer lewy\n";
-        return false;
-    }
     int trick_number = 0;
-    if(message[5] == '1' && isdigit(message[6])){
-        trick_number = 10;
-        trick_number += message[6] - '0';
+    if(( message[7] >= '1' && message[7] <= '9')|| message[7] == 'J' || message[7] == 'Q' || message[7] == 'K' || message[7] == 'A'){
+        
+        if(isdigit(message[5]) && isdigit(message[6])){
+            trick_number = 10 * (message[5] - '0');
+            trick_number += message[6] - '0';
+
+        }else{
+            return false;
+        }
+    // nie 
     }else{
-        trick_number = message[5] - '0';
+        if(isdigit(message[5])){
+            trick_number = message[5] - '0';
+        }else{
+            return false;
+        }
     }
+
     if(trick_number != current_trick){
         std::cout << "FIXME: niepoprawny numer lewy\n";
         return false;
     }
 
+    // czy jest poprawną listą kart
     if(!is_string_correct_card_list(message.substr(6 + (trick_number >= 10), message.length() - 9 - (trick_number >= 10)))){
         std::cout << "FIXME: niepoprawna lista kart\n";
-        std::cout << message.substr(6 + (trick_number >= 10), message.length() - 9 - (trick_number >= 10)) << "\n";
+        // std::cout << message.substr(6 + (trick_number >= 10), message.length() - 9 - (trick_number >= 10)) << "\n";
         return false;
     }
     std::vector<std::string> cards_vec = Card::extractCardsVectorFromCardsStringStr(message.substr(6 + (trick_number >= 10), message.length() - 9 - (trick_number >= 10)));
     int in_my_hand = 0;
-    std::cout << "FIXME: wektor kart: \n";
-    for(std::string card : cards_vec){
-        std::cout << card << "\n";
-    }
+    // std::cout << "FIXME: wektor kart: \n";
+    // for(std::string card : cards_vec){
+    //     std::cout << card << "\n";
+    // }
     for(std::vector<std::string>::size_type i = 0; i < cards_vec.size(); i++){
         if(cardSet.isCardInSet(Card::stringToCard(cards_vec[i]))){
             in_my_hand++;
@@ -276,23 +294,22 @@ bool Klient::validateWRONG(const std::string& message){
         return false;
     }
     int trick_number = 0;
-    if(message[5] == '1'){
-        trick_number = 10;
-        if (isdigit(message[6])){
-            trick_number += message[6] - '0';
-        }
-    }else{
+    if(message.length() == 8){
         trick_number = message[5] - '0';
+    }else{
+        trick_number = 10 * (message[5] - '0');
+        trick_number += message[6] - '0';
     }
+
     if(trick_number != current_trick){
         return false;
     }
 
     return true;
 }
-bool Klient::validateSCORE(const std::string& message){
+bool validateSCORE(const std::string& message) {
+    const std::regex pattern(R"(SCORE[NSEW](0|[1-9]\d*)[NSEW](0|[1-9]\d*)[NSEW](0|[1-9]\d*)[NSEW](0|[1-9]\d*)\r\n)");
 
-    const std::regex pattern(R"(SCORE[NSEW]\d+[NSEW]\d+[NSEW]\d+[NSEW]\d+\r\n)");
     if (!std::regex_match(message, pattern)) {
         return false;
     }
@@ -300,7 +317,7 @@ bool Klient::validateSCORE(const std::string& message){
     std::unordered_map<char, int> seat_count = {{'N', 0}, {'S', 0}, {'E', 0}, {'W', 0}};
 
     // Przejdź przez ciąg i zlicz wystąpienia liter N, S, E, W
-    for (char ch : message) {
+    for (char ch : message.substr(5)) {
         if (seat_count.find(ch) != seat_count.end()) {
             seat_count[ch]++;
         }
@@ -317,7 +334,7 @@ bool Klient::validateSCORE(const std::string& message){
 }
 bool Klient::validateTOTAL(const std::string& message){
 
-    const std::regex pattern(R"(TOTAL[NSEW]\d+[NSEW]\d+[NSEW]\d+[NSEW]\d+\r\n)");
+    const std::regex pattern(R"(TOTAL[NSEW](0|[1-9]\d*)[NSEW](0|[1-9]\d*)[NSEW](0|[1-9]\d*)[NSEW](0|[1-9]\d*)\r\n)");
     if (!std::regex_match(message, pattern)) {
         return false;
     }
@@ -342,15 +359,10 @@ bool Klient::validateTOTAL(const std::string& message){
 }
 int Klient::validateMessage(const std::string& message){
 
-    // if(isBot){
-    //     raport(get_server_address(socket_fd), get_local_address(socket_fd), message);
-    // }
     if(validateBUSY(message)){
-        // std::cout << "FIXME: rozpoznano BUSY\n";
         return BUSY;
     }
     if(validateDEAL(message)){
-        // std::cout << "FIXME: rozpoznano DEAL\n";
         return DEAL;
     }
     if(validateTRICK(message)){

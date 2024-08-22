@@ -194,11 +194,12 @@ std::string extract_card_list_from_taken(const std::string& message) {
     std::regex pattern(R"(TAKEN\d+((?:10|[2-9]|[JQKA])[HDCS]+)([NEWS])\r\n$)");
     std::smatch matches;
     std::cout << "FIXME: w extract_card_list message to " << message << std::endl;
+    std::cout << "FIXME: length of message is " << message.length() << std::endl;
     if (std::regex_search(message, matches, pattern)) {
         std::string card_list = matches[1].str(); // Wyciągamy listę kart
         std::cout << "FIXME: w extract_card_list" << card_list << std::endl;
         std::string formatted_list;
-        
+        card_list = "AS2H3D4C5S6H7D8C9S10HJSQDKC";
         // Przetwarzanie kart i formatowanie listy
         for (size_t i = 0; i < card_list.length(); i += 2) {
             if (i > 0) {
