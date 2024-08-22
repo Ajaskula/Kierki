@@ -157,11 +157,11 @@ bool Klient::validateDEAL(const std::string& message){
 }
 bool Klient::validateTRICK(const std::string& message){
     if(message.length() < 8 || message.length() > 18){
-        std::cout << "FIXME: długość wiadomości niepoprawna\n";
+        
         return false;
     }
     if(message.substr(0, 5) != "TRICK"){
-        std::cout << "FIXME: niepoprawne słowo kluczowe\n";
+        
         return false;
     }
 
@@ -187,42 +187,35 @@ bool Klient::validateTRICK(const std::string& message){
     }
 
     if(trick_number != current_trick){
-        std::cout << "FIXME: niepoprawny numer lewy\n";
         return false;
     }
 
     // sprawdzenie listy kart, czy zawiera poprawne karty
     if(!is_string_correct_card_list(message.substr(7 - (trick_number >= 10), message.length() - 8 - (trick_number >= 10)))){
-        std::cout << "FIXME: niepoprawna lista kart\n";
         return false;
     }
     std::vector<std::string> cards_vec = Card::extractCardsVectorFromCardsStringStr(message.substr(7 - (trick_number >= 10), message.length() - 8 - (trick_number >= 10)));
     
     if(cards_vec.size() >= 4){
-        std::cout << "FIXME: zbyt wiele kart\n";
         return false;
     }
 
     // muszę jeszcze sprawdzić, czy nie posiadam takiej karty jak te wyłożone na stole
     for(std::vector<std::string>::size_type i = 0; i < cards_vec.size(); i++){
         if(cardSet.isCardInSet(Card::stringToCard(cards_vec[i]))){
-            std::cout << "FIXME: posiadam kartę, którą wyłożono na stół\n";
             return false;
         }
     }
     return true;
 }
 bool Klient::validateTAKEN(const std::string& message){
-    std::cout << "FIXME: próbuje rozpoznać TAKEN\n";
     // sprawdzenie długości
     if(message.length() < 17 || message.length() > 22){
-        std::cout << "FIXME: długość wiadomości niepoprawna\n";
         return false;
     }
 
     // sprawdzenie pierwszego słowa
     if(message.substr(0, 5) != "TAKEN"){
-        std::cout << "FIXME: niepoprawne słowo kluczowe\n";
         return false;
     }
 
@@ -247,35 +240,25 @@ bool Klient::validateTAKEN(const std::string& message){
     }
 
     if(trick_number != current_trick){
-        std::cout << "FIXME: niepoprawny numer lewy\n";
         return false;
     }
 
     // czy jest poprawną listą kart
     if(!is_string_correct_card_list(message.substr(6 + (trick_number >= 10), message.length() - 9 - (trick_number >= 10)))){
-        std::cout << "FIXME: niepoprawna lista kart\n";
-        // std::cout << message.substr(6 + (trick_number >= 10), message.length() - 9 - (trick_number >= 10)) << "\n";
         return false;
     }
     std::vector<std::string> cards_vec = Card::extractCardsVectorFromCardsStringStr(message.substr(6 + (trick_number >= 10), message.length() - 9 - (trick_number >= 10)));
     int in_my_hand = 0;
-    // std::cout << "FIXME: wektor kart: \n";
-    // for(std::string card : cards_vec){
-    //     std::cout << card << "\n";
-    // }
     for(std::vector<std::string>::size_type i = 0; i < cards_vec.size(); i++){
         if(cardSet.isCardInSet(Card::stringToCard(cards_vec[i]))){
             in_my_hand++;
         }
     }
     if(in_my_hand != 1){
-        std::cout << "FIXME: niepoprawna liczba kart z mojej ręki\n";
-        std::cout << "Liczbę kart z mojej ręki: " << in_my_hand << "\n";
         return false;
     }
 
     if(message[message.length() - 3] != 'N' && message[message.length() - 3] != 'S' && message[message.length() - 3] != 'E' && message[message.length() - 3] != 'W'){
-        std::cout << "FIXME: niepoprawna pozycja\n";
         return false;
     }
     
@@ -307,7 +290,7 @@ bool Klient::validateWRONG(const std::string& message){
 
     return true;
 }
-bool validateSCORE(const std::string& message) {
+bool Klient::validateSCORE(const std::string& message) {
     const std::regex pattern(R"(SCORE[NSEW](0|[1-9]\d*)[NSEW](0|[1-9]\d*)[NSEW](0|[1-9]\d*)[NSEW](0|[1-9]\d*)\r\n)");
 
     if (!std::regex_match(message, pattern)) {
@@ -393,15 +376,15 @@ void Klient::printTakenTricks(){
 void Klient::performTaken(const std::string& message){
     
     // jeśli ja biorę lewę to dodaje do wziętę karty do historii lew
-    std::string card_list = extract_card_list_from_taken(message);
-    std::cout << "FIXME: card_list: " << card_list << "\n";
-    if(position == message[message.length() - 3]){
-        // TODO dołóż kartę do historii lew
-        tricks_taken.push_back(card_list);
-        std::cout << "FIXME: dodano kartę do historii lew\n";
+    std::vector<std::string> card_vector = Card::extractCardsVectorFromCardsStringStr(message.substr(6 + (current_trick >= 10), message.length() - 9 - (current_trick >= 10)));
+    std::string card_list;
+    for(std::vector<std::string>::size_type i = 0; i < card_vector.size(); i++){
+        card_list += card_vector[i] + ", ";
     }
-    std::vector<std::string> card_vector = extract_card_vector_from_taken(message);
-    // usuwam z ręki kartę którą wziąłem
+    card_list = card_list.substr(0, card_list.length() - 2);
+    if(position == message[message.length() - 3]){
+        tricks_taken.push_back(card_list);
+    }
     for(std::string card : card_vector){
         cardSet.removeCard(Card::stringToCard(card));
     }
@@ -505,20 +488,16 @@ int Klient::run(){
             if(received_char == '\n'){
                 if(buffer_index > 1 && buffer[buffer_index - 2] == '\r'){
                     std::string message(buffer, buffer_index);
-                    // std::cout << "Received message: " << message;
                     if(isBot){
                         raport(server_address, local_address, message);
                     }
                     // jeśli jestem na etapie oczekiwania na wiadomość DEAL lub BUSY
                     if(wait_DEAL){
                         if(validateMessage(message) == BUSY){
-                            std::cout << "FIXME: ROZPOZNANO BUSY\n";
                             if(!isBot){
                                 std::cout << "Place busy, list of busy places received: " + get_busy_places_from_BUSY(message) + ".\n";
                             }
-                            std::cout << "FIXME: Place busy, list of busy places received: " + get_busy_places_from_BUSY(message) + ".\n";
                         }else if(validateMessage(message) == DEAL){
-                                std::cout << "FIXME: ROZPOZNANO DEAL\n";
                             cardSet.addCardsFromCardsString(message.substr(6, message.length() - 8));
                             if(!isBot){
                                 std::cout << "New deal " << message[4] << ": staring place " << message[5] << ", your cards: " << cardSet.getCardsOnHand() <<".\n";
@@ -532,9 +511,7 @@ int Klient::run(){
                             current_trick = 1;
                         }
                     }else if(current_trick < 14){
-                        std::cout << "FIXME: PRÓbuje rozpoznać TRICK\n";
                         if(validateMessage(message) == TRICK){
-                            std::cout << "FIXME: ROZPOZNANO TRICK\n";
                             got_TRICK = true;
                             wait_first_TRICK = false;
 
@@ -549,7 +526,6 @@ int Klient::run(){
                                 send_message(socket_fd, to_send);
                             }
                         }else if(validateMessage(message) == TAKEN){
-                            std::cout << "FIXME: ROZPOZNANO TAKEN\n";
                             // tylko jeśli czekam wciąż na pierwszego tricka
                             if(wait_first_TRICK || got_TRICK){
                                 if(!isBot){
@@ -557,12 +533,10 @@ int Klient::run(){
                                 }
                                 //TODO implement perform TAKEN (jeśli ja biorę lewę to biorę, ale dodatkowo usuwam na pewno kartę z ręki)
                                 performTaken(message);
-                                std::cout << "FIXME: wykonano perform taken\n";
                                 current_trick++;
                                 got_TRICK = false;
                             
                             }else if(validateMessage(message) == WRONG){
-                                std::cout << "FIXME: ROZPOZNANO WRONG\n";
                                 if(!isBot){
                                     std::cout << "Wrong message received in trick " << message[5] << ".\n";
                                 }
@@ -573,7 +547,7 @@ int Klient::run(){
                     // tutaj jest okej, bo mogę to otrzymać jedynie gdy curr_trick == 14
                     }else{
                             if(validateMessage(message) == SCORE){
-                                std::cout << "FIXME: ROZPOZNANO SCORE\n";
+                                
                                 // w przypadku tej implementacj też chyba nic nie robię
                                 if(!isBot){
                                     std::cout << convert_score_message(message) << "\n";
@@ -581,7 +555,7 @@ int Klient::run(){
                                 wait_SCORE = false;
 
                             }else if(validateMessage(message) == TOTAL){
-                                std::cout << "FIXME: ROZPOZNANO TOTAL\n";
+                                
                                 if(!isBot){
                                     std::cout << convert_total_message(message) << "\n";
                                 }
