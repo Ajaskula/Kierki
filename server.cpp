@@ -1,18 +1,15 @@
-#include <iostrim>
-#include "Server.h"
+#include <iostream>
+#include "server.h"
 #include "common.h"
 
 
-int parseArguments(int argc, char* argv[], uint16_t& port, std::string& file, int& timeout){
-
-    // przechodzę przez wszystkie argumenty
+int Server::parseArguments(int argc, char* argv[], uint16_t& port, std::string& file, int& timeout){
     for(int i = 1; i < argc; i++){
         std::string arg = argv[i];
 
         if(arg == "-p" && i + 1 < argc){
             port = std::stoi(argv[i + 1]);
             i++;
-            // std::cout << "Port: " << port << "\n";
         } else if(arg == "-f" && i + 1 < argc){
 
             file = argv[i + 1];
@@ -47,19 +44,14 @@ int parseArguments(int argc, char* argv[], uint16_t& port, std::string& file, in
 
 
 Server::Server(uint16_t port, const std::string& file, int timeout)
-        : port(port), file(file), timeout(timeout), cardSet(true)
-        {   
-            std::cout << "Instancja serwera została stworzona\n";
-        }
+        : port(port), file(file), timeout(timeout), cardSet(true), connected_players(0), gameplay(file){}
 
-Server::~Server(){
-            std::cout << "Instancja serwera została zniszczona\n";
-        }
+Server::~Server(){}
 
 // funkcja sprawdzająca poprawność wiadomości IAM
-bool Server::validate_IAM(const std::string& message){
+bool Server::validateIAM(const std::string& message){
 
-    if(message.length() != 4){
+    if(message.length() != 6){
         return false;
     }
     if(message[3] != 'N' && message[3] != 'S' && message[3] != 'W' && message[3] != 'E'){
@@ -68,3 +60,51 @@ bool Server::validate_IAM(const std::string& message){
 
     return true;
 }
+bool Server::validateTRICK(const std::string& message){
+    //FIXME: implement
+    return true;
+}
+int Server::pointsInTrick(const std::string& trick, int type){
+    
+    int sum_of_points = 0;
+    switch(type){
+        case 1:
+            return 1;
+        case 2:
+            return calculateNumOfHeartsInTrick(trick);
+        case 3:
+            return 5 * calculateNumOfQueensInTrick(trick);
+        case 4:
+            return 2 * calculateNumOfManInTrick(trick);
+        case 5:
+            return 18 * checkIfKingOfHeartsInTrick(trick);
+        case 6:
+            return 10 * ((current_trick == 7) + (current_trick == 13));
+        case 7:
+            for(int i = 1; i < 7; i+=1){
+                sum_of_points += pointsInTrick(trick, i);
+            }
+            return sum_of_points;
+        default:
+            return 0;
+    }
+    return 0;
+}
+int Server::calculateNumOfHeartsInTrick(const std::string& trick){
+    //FIXME:: implement
+    return 0;
+}
+int Server::calculateNumOfQueensInTrick(const std::string& trick){
+    // FIXME:: implement
+    return 0;
+}
+int Server::calculateNumOfManInTrick(const std::string& trick){
+    //FIXME:: implement
+    return 0;
+}
+int Server::checkIfKingOfHeartsInTrick(const std::string& trick){
+    // FIXME:: implement
+    return 0;
+}
+
+

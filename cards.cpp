@@ -196,3 +196,45 @@ void CardSet::addCardsFromCardsString(const std::string& cards){
         addCard(Card(card[card.length()-1], Card::stringToRank(card.substr(0, card.length() - 1))));
     }
 }
+
+Gameplay::Gameplay(const std::string& filename) : filename(filename), dealsToPlay() {
+    
+    createDealsFromFile();
+}
+Gameplay::~Gameplay(){
+}
+
+// funkcja, która tworzy rozgrywkę na podstawie pliku
+// wczytuje odpowiednie rozdania
+void Gameplay::createDealsFromFile(){
+    std::cout << "Creating deals from file: " << filename << std::endl;
+    std::ifstream file(filename);
+    std::string line;
+
+    while(std::getline(file, line)){
+        if(line.empty()){
+            continue;
+        }
+        char type = line[0];
+        char firstPlayer = line[1];
+
+        std::string dealN, dealE, dealS, dealW;
+        std::getline(file, dealN);
+        std::getline(file, dealE);
+        std::getline(file, dealS);
+        std::getline(file, dealW);
+
+        Deal deal(type, firstPlayer, dealN, dealE, dealS, dealW);
+        dealsToPlay.push_back(deal);
+    }
+}
+
+Deal::Deal(char type, char firstPlayer, const std::string& dealN, const std::string& dealE, const std::string& dealS, const std::string& dealW) : type(type), firstPlayer(firstPlayer), dealN(dealN), dealE(dealE), dealS(dealS), dealW(dealW) {
+    std::cout << "Creating deal of type: " << type << " with first player: " << firstPlayer << std::endl;
+    std::cout << "Deal for N: " << dealN << std::endl;
+    std::cout << "Deal for E: " << dealE << std::endl;
+    std::cout << "Deal for S: " << dealS << std::endl;
+    std::cout << "Deal for W: " << dealW << std::endl;
+}
+Deal::~Deal(){
+}

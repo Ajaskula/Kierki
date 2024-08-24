@@ -5,6 +5,7 @@
 #include <iostream>
 #include <vector>
 #include "common.h"
+#include <fstream>
 
 
 enum class Rank { Two, Three, Four, Five, Six, Seven, Eight, Nine, Ten, Jack, Queen, King, Ace, Unknown };
@@ -57,4 +58,38 @@ class CardSet{
         void initializeFullDeck();
         std::vector<Card> cards;
 };
+
+// klasa rozdania, definiowana poprzez elementy pliku
+class Deal{
+    public:
+        Deal(char type, char firstPlayer, const std::string& dealN, const std::string& dealE, const std::string& dealS, const std::string& dealW);
+        ~Deal();
+
+    private:
+        char type;
+        char firstPlayer;
+        std::string dealN;
+        std::string dealE;
+        std::string dealS;
+        std::string dealW;
+};
+
+// klasa rozgrywki, definiowana
+// poprzez plik
+class Gameplay{
+    // konstruktor i destruktor rozgrywki
+    public:
+        Gameplay(const std::string& filename);
+        ~Gameplay();
+
+
+    private:
+        // nazwa pliku, na podstawie, którego będzie tworzona rozgrywka
+        std::string filename;
+        std::vector<Deal> dealsToPlay;
+        void createDealsFromFile();
+};
+
+
+
 #endif
