@@ -13,7 +13,8 @@ int main(int argc, char *argv[]){
         std::cerr << "Podane parametry są niepoprawne\n";
     }
     Server server(port, file, timeout);
-    
-    // return ret_value;
-    return 0;
+    int ret_value = server.run();
+
+    std::cout << "Serwer zakończył działanie\n";
+    return ret_value;
 }

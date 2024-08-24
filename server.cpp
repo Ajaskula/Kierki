@@ -44,7 +44,7 @@ int Server::parseArguments(int argc, char* argv[], uint16_t& port, std::string& 
 
 
 Server::Server(uint16_t port, const std::string& file, int timeout)
-        : port(port), file(file), timeout(timeout), cardSet(true), connected_players(0), gameplay(file){}
+        : port(port), file(file), timeout(timeout), connected_players(0), gameplay(file), queue_length(5){}
 
 Server::~Server(){}
 
@@ -105,6 +105,101 @@ int Server::calculateNumOfManInTrick(const std::string& trick){
 int Server::checkIfKingOfHeartsInTrick(const std::string& trick){
     // FIXME:: implement
     return 0;
+}
+
+int Server::run(){
+
+    int socket_fd_ipv4 = setupServerSocketIPv4();
+    if(socket_fd_ipv4 < 0){
+        std::cerr << "Błąd podczas tworzenia gniazda IPv4\n";
+        return 1;
+    }
+    int socket_fd_ipv6 = setupServerSocketIPv6();
+    if(socket_fd_ipv6 < 0){
+        std::cerr << "Błąd podczas tworzenia gniazda IPv6\n";
+        return 1;
+    }
+
+
+    close(socket_fd_ipv4);
+    close(socket_fd_ipv6);
+    return 0;
+}
+
+int Server::setupServerSocketIPv4(){
+    std::cout << "Próbuje utworzyć gniazdo\n";
+    
+    int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if(socket_fd < 0){
+        std::cerr << "Błąd podczas tworzenia gniazda\n";
+        return 1;
+    }
+
+    struct sockaddr_in server_address;
+    server_address.sin_family = AF_INET;
+    server_address.sin_addr.s_addr = htonl(INADDR_ANY);
+    server_address.sin_port = htons(port);
+
+    // próbuje bindować gniazdo do konkretnego adresu
+    if(bind(socket_fd, (struct sockaddr*)&server_address, (socklen_t) sizeof(server_address)) < 0){
+        std::cerr << "Błąd podczas bindowania gniazda\n";
+        return 1;
+    }
+
+    if(listen(socket_fd, queue_length) < 0){
+        std::cerr << "Błąd podczas nasłuchiwania na gnieździe\n";
+        return 1;
+    }
+
+
+    // sprawdźmy jaki port został wybrany
+    socklen_t length = (socklen_t) sizeof server_address;
+    if (getsockname(socket_fd, (struct sockaddr*) &server_address, &length) < 0){
+        std::cerr << "Błąd podczas pobierania numeru portu\n";
+        return 1;
+    }
+    std::cout << "Serwer nasłuchuje na porcie: " << ntohs(server_address.sin_port) << "\n";
+
+    return socket_fd;
+}
+
+
+int Server::setupServerSocketIPv6(){
+    std::cout << "Próbuje utworzyć gniazdo\n";
+
+    int socket_fd = socket(AF_INET6, SOCK_STREAM, 0);
+    if(socket_fd < 0){
+        std::cerr << "Błąd podczas tworzenia gniazda\n";
+        return 1;
+    }
+
+    struct sockaddr_in6 server_address;
+    memset(&server_address, 0, sizeof(server_address));
+    server_address.sin6_family = AF_INET6;
+    server_address.sin6_addr = in6addr_any;
+    server_address.sin6_port = htons(port);
+
+    // próbuje bindować gniazdo do konkretnego adresu
+    if(bind(socket_fd, (struct sockaddr*)&server_address, (socklen_t) sizeof(server_address)) < 0){
+        std::cerr << "Błąd podczas bindowania gniazda\n";
+        return 1;
+    }
+
+    // przełączam gniazdo w tryb nasłuchiwania
+    if(listen(socket_fd, queue_length) < 0){
+        std::cerr << "Błąd podczas nasłuchiwania na gnieździe\n";
+        return 1;
+    }
+
+    // sprawdzam jaki port został wybrany
+    socklen_t length = (socklen_t) sizeof server_address;
+    if (getsockname(socket_fd, (struct sockaddr*) &server_address, &length) < 0){
+        std::cerr << "Błąd podczas pobierania numeru portu\n";
+        return 1;
+    }
+    std::cout << "Serwer nasłuchuje na porcie: " << ntohs(server_address.sin6_port) << "\n";
+
+    return socket_fd;
 }
 
 

@@ -22,15 +22,17 @@ class Server{
         int calculateNumOfManInTrick(const std::string& trick);
         int checkIfKingOfHeartsInTrick(const std::string& trick);
         int readDealsFromFile(const std::string& filename);
-        
+        int setupServerSocketIPv4();
+        int setupServerSocketIPv6();
 
     private:
         uint16_t port;
         std::string file;
         int timeout;
-        CardSet cardSet;
-        int current_trick;
         int connected_players;
+        Gameplay gameplay;
+        int queue_length;
+        int current_trick;
         // triczki przyjęte przez konkretnego gracza
         std::vector<std::string> tricks_taken_N;
         std::vector<std::string> tricks_taken_S;
@@ -42,6 +44,10 @@ class Server{
         std::vector<std::string> deal_W;
         std::vector<std::string> deal_E;
         int pointsInTrick(const std::string& trick, int type);
-        Gameplay gameplay;
+        // karty, które są na ręce konkretnego gracza
+        std::vector<std::string> cards_on_hand_N;
+        std::vector<std::string> cards_on_hand_S;
+        std::vector<std::string> cards_on_hand_W;
+        std::vector<std::string> cards_on_hand_E;
 };
 #endif // SERVER_H

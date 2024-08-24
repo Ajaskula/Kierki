@@ -82,7 +82,6 @@ class Gameplay{
         Gameplay(const std::string& filename);
         ~Gameplay();
 
-
     private:
         // nazwa pliku, na podstawie, którego będzie tworzona rozgrywka
         std::string filename;
