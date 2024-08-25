@@ -457,6 +457,13 @@ int Klient::run(){
     struct pollfd fds[2]; fds[0].fd = socket_fd;  fds[0].events = POLLIN; fds[1].fd = STDIN_FILENO;  fds[1].events = POLLIN;
     char buffer[1024]; memset(buffer, 0, 1024); size_t buffer_index = 0;
 
+    // TODO implement non-blocking sending
+    // TODO mabye try to implement reading more than one byte at a time
+
+    // TODO implement poll error handling
+    // TODO implement writing out correct message
+    // TODO check if writing out is as it should be, pay attention to stdout, and stderr
+
     while(true){
 
         for(int i = 0; i < 2; i++){ fds[i].revents = 0; }

@@ -110,108 +110,132 @@ int Server::checkIfKingOfHeartsInTrick(const std::string& trick){
 
 int Server::run(){
 
-    // int socket_fd_ipv4 = setupServerSocketIPv4();
-    // if(socket_fd_ipv4 < 0){
-    //     std::cerr << "Błąd podczas tworzenia gniazda IPv4\n";
-    //     return 1;
-    // }
+    // tworzę gniazdo obsługujące zarówno połączenia ipv4 jak i ipv6
     int socket_fd_ipv6 = setupServerSocketIPv6();
     if(socket_fd_ipv6 < 0){
         std::cerr << "Błąd podczas tworzenia gniazda IPv6\n";
         return 1;
     }
 
-    // ustawiam timeout
-    struct timeval tv;
-    tv.tv_sec = timeout;
-    tv.tv_usec = 0;
-
-    // inicjalizacji struktury pollfd
+    // tablica z deskryptorami klientów chcących rozegrać grę
     struct pollfd poll_descriptors[6];
-
-    // dwa pierwsze sockety nasłuchują na połączenia
-    // poll_descriptors[0].fd = socket_fd_ipv4;
-    // poll_descriptors[0].events = POLLIN;
     poll_descriptors[0].fd = socket_fd_ipv6;
     poll_descriptors[0].events = POLLIN;
 
     // pozostałe sockety, bądą obsługiwać połączenia z klientami
-    for(int i = 2; i < 6; i++){
+    for(int i = 1; i < 6; i++){
         poll_descriptors[i].fd = -1;
         poll_descriptors[i].events = POLLIN;
     }
-    bool finish = false;
-    // wykonuje dopóki nie pojawi się 4 graczy
-    while(1){
-        // std::cout << "Czekam na graczy\n";
-        int poll_status = poll(poll_descriptors, 6, timeout);
-      // jeśi pojawił się jakiś gracz
-      if(poll_descriptors[0].revents & POLLIN){
-          int client_fd = accept(poll_descriptors[0].fd, NULL, NULL);
-          if(client_fd < 0){
-              std::cerr << "Błąd podczas akceptowania połączenia\n";
-              return 1;
-          }
-          std::cout << "Połączono z klientem\n";
-          std::string message = "BUSYNESS\r\n";
-          int bytes_sent = send(client_fd, message.c_str(), message.length(), 0);
-          // sendmessage(client_fd, message);
-        //   close(client_fd);
-
-      }
+    // tworzę bufory dla poszczególnych klientów i poczekalni
+    // powinienem mieć dla każdego dwa deskryptory, deskryptor gotowy do odczytu
+    // deskryptor gotowy do zapisu
+    // O 
+    char buffer[6][BUFFER_SIZE];
+    // countery dla poszczególnych klientów
+    for(int i = 0; i < 6; i++){
+        // zeruję bufory
+        memset(buffer[i], 0, BUFFER_SIZE);
     }
-    // do{
+    // inicjalizacja liczników buforów dla klientów
+    size_t buffer_counter[6];
+    for(int i = 0; i < 6; i++){
+        buffer_counter[i] = 0;
+    }
+    auto last_event_timeN = std::chrono::steady_clock::now();
+    auto last_event_timeS = std::chrono::steady_clock::now();
+    auto last_event_timeW = std::chrono::steady_clock::now();
+    auto last_event_timeE = std::chrono::steady_clock::now();
+    auto last_event_timeWaiting = std::chrono::steady_clock::now();
 
-    //     // zerujemy zdarzenie, które zaszły na deskryptorach
-    //     for(int i = 0; i < 6; i++){
-    //         poll_descriptors[i].revents = 0;
-    //     }
+    // orgument opsiujący wyłożone przez kolejnych użytkoników karty
+    // TODO: implement errors in poll
+    std::string lined_cards = "";
+    bool finish = false;
+    while(finish == false){
 
-    //     // czekamy na zdarzenia na deskryptorach
-    //     int poll_status = poll(poll_descriptors, 6, timeout);
+        // zerujemy wydarzenia dla wszystkich deskryptorów
+        for(int i = 0; i < 6; i++){
+            poll_descriptors[i].revents = 0;
+        }
 
-    //     if(poll_status < 0){
-    //         std::cerr << "Błąd podczas wywołania poll\n";
-    //         return 1;
+        // czekam na zdarzenia maksymalnie timout
+        //TODO implement timeout
+        // TODO implement not readeing at once
+        int poll_status = poll(poll_descriptors, 6, -1);
+        // arguement na 
 
-    //     }
+        // jeśli nie ma nikogo w poczeklani to przyjmuje połączenie i przerzucam osobnika na poczekalnie
+        if(poll_descriptors[0].revents & POLLIN && poll_descriptors[0].fd != -1){
 
-        // to znaczy, żę pojawiły się jakieś zdarzenia
-        // if(poll_status > 0){
+            // najpierw akceptuje połączenie z tym klientem
+            int waiting_room = accept(socket_fd_ipv6, NULL, NULL);
+            // aktualizuje czas ostatniego zdarzenia
+            last_event_timeWaiting = std::chrono::steady_clock::now();
+            if(waiting_room < 0){
+                std::cerr << "Błąd podczas akceptowania połączenia\n";
+                return 1;
+            }
+            // dodaję deskryptor do tablicy
+            poll_descriptors[5].fd = waiting_room;
+        }
 
-        //     // jeśli pojawiło się zdarzenia na głównym sockecie IPv4
-        //     if(poll_descriptors[0].revents & POLLIN){
+        // sprawdzam czy coś dzieje się w poczeklani
+        if(poll_descriptors[5].fd != -1){
 
-        //         // jeśli rozgrywka trwa, to od razu odsyłam busy
-        //         if(connected_players == 4){
+            // jeśli ktoś jest w poczeklani
+            // to sprawdzam czy nie przysłał mi wiadomości
+            if(poll_descriptors[5].revents & POLLIN){
 
-        //             int client_fd = accept(poll_descriptors[0].fd, NULL, NULL);
-        //             if(client_fd < 0){
-        //                 std::cerr << "Błąd podczas akceptowania połączenia\n";
-        //                 return 1;
-        //             }
-        //             std::string message = "BUSYNESW\r\n";
-        //             // sendmessage(client_fd, message);
-        //             close(client_fd);
+                // FIXME:: implement timeout
+                // jeśli przysłał wczytuje wiadomość
+                ssize_t bytes_received = read(poll_descriptors[5].fd, buffer[5] + buffer_counter[5], 1);
 
-        //         }else if(/*w tablicy deskryptorów jest mniej niż 4*/){
-        //             // szukam wolnego miejsca w tablicy deskryptorów
-        //             // na każdym z tych deskryptorów ustawiam timeout
-        //             // albo go akceptuje albo odsyłam 
+                if(bytes_received < 0){
+                    std::cerr << "Błąd podczas odczytywania wiadomości\n";
+                    close(poll_descriptors[5].fd);
+                    poll_descriptors[5].fd = -1;
+                    return 1;
 
-        //         }
+                // klient się rozłączył trzeba to jakoś obsłużyć
+                }else if(bytes_received == 0){
+                    close(poll_descriptors[5].fd);
+                    poll_descriptors[5].fd = -1;
+                }
 
-        //     }
+                char received_char = buffer[5][buffer_counter[5]];
+                buffer_counter[5] += 1;
+                
+                // jeśli jest to możliwy koniec wiadomości
+                if(received_char == '\n'){
+                    if(buffer_counter[5] > 1 && buffer[5][buffer_counter[5] - 2] == '\r'){
+                        std::string message(buffer[5], buffer_counter[5]);
+                        // FIXME: implement raport
 
-            // jeśli pojawiła się jakaś wiadomość, na którymś z deskryptorów
-            // być może mogę zamknąć wtedy połączenie, a być możę będę miał już gotowego gracza
-    //     }
+                    }
+                }
 
-    // }while(!finish);
+            // nie ma danych do odczytrania, więc sprawdzam czy nie mineło wystarczająco dużo czasu
+            }else{
+                
+                // jeśli mineło zbyt dużo czasu
+                // if(std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - last_event_timeWaiting).count() > timeout){
+                //     // zamykam połączenie z klientem
+                //     close(poll_descriptors[5].fd);
+                //     poll_descriptors[5].fd = -1;
+
+                // }
+            }
+        }
+
+        // jeśli wykonaliśmy już wszystkie rzeczy to zmieniamy finish na true
+        // i kończymy program, rozłączamy wtedy wszystkich klientów
+
+    }
+    
 
 
-
-    // close(socket_fd_ipv4);
+    // zamykam gniazdo, rozgrywka zakończona prawidłowo
     close(socket_fd_ipv6);
     return 0;
 }
