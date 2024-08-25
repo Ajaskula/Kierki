@@ -535,12 +535,11 @@ int Klient::run(){
                                 performTaken(message);
                                 current_trick++;
                                 got_TRICK = false;
-                            
-                            }else if(validateMessage(message) == WRONG){
+                            }
+                        }else if(validateMessage(message) == WRONG){
                                 if(!isBot){
                                     std::cout << "Wrong message received in trick " << message[5] << ".\n";
                                 }
-                            }
                         }
                     
                     // tutaj powinienem otrzymać SCORE i TOTAL

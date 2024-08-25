@@ -4,6 +4,8 @@
 #include <string>
 #include "common.h"
 #include "cards.h"
+#include "sys/socket.h"
+#include "poll.h"
 
 class Server{
     public:
@@ -32,6 +34,10 @@ class Server{
         int connected_players;
         Gameplay gameplay;
         int queue_length;
+        bool is_N_connected;
+        bool is_S_connected;
+        bool is_W_connected;
+        bool is_E_connected;
         int current_trick;
         // triczki przyjęte przez konkretnego gracza
         std::vector<std::string> tricks_taken_N;

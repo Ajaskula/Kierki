@@ -44,7 +44,8 @@ int Server::parseArguments(int argc, char* argv[], uint16_t& port, std::string& 
 
 
 Server::Server(uint16_t port, const std::string& file, int timeout)
-        : port(port), file(file), timeout(timeout), connected_players(0), gameplay(file), queue_length(5){}
+        : port(port), file(file), timeout(timeout), connected_players(0), gameplay(file), queue_length(5), is_E_connected(false), is_N_connected(false), is_S_connected(false), is_W_connected(false), current_trick(0)
+        {}
 
 Server::~Server(){}
 
@@ -109,19 +110,108 @@ int Server::checkIfKingOfHeartsInTrick(const std::string& trick){
 
 int Server::run(){
 
-    int socket_fd_ipv4 = setupServerSocketIPv4();
-    if(socket_fd_ipv4 < 0){
-        std::cerr << "Błąd podczas tworzenia gniazda IPv4\n";
-        return 1;
-    }
+    // int socket_fd_ipv4 = setupServerSocketIPv4();
+    // if(socket_fd_ipv4 < 0){
+    //     std::cerr << "Błąd podczas tworzenia gniazda IPv4\n";
+    //     return 1;
+    // }
     int socket_fd_ipv6 = setupServerSocketIPv6();
     if(socket_fd_ipv6 < 0){
         std::cerr << "Błąd podczas tworzenia gniazda IPv6\n";
         return 1;
     }
 
+    // ustawiam timeout
+    struct timeval tv;
+    tv.tv_sec = timeout;
+    tv.tv_usec = 0;
 
-    close(socket_fd_ipv4);
+    // inicjalizacji struktury pollfd
+    struct pollfd poll_descriptors[6];
+
+    // dwa pierwsze sockety nasłuchują na połączenia
+    // poll_descriptors[0].fd = socket_fd_ipv4;
+    // poll_descriptors[0].events = POLLIN;
+    poll_descriptors[0].fd = socket_fd_ipv6;
+    poll_descriptors[0].events = POLLIN;
+
+    // pozostałe sockety, bądą obsługiwać połączenia z klientami
+    for(int i = 2; i < 6; i++){
+        poll_descriptors[i].fd = -1;
+        poll_descriptors[i].events = POLLIN;
+    }
+    bool finish = false;
+    // wykonuje dopóki nie pojawi się 4 graczy
+    while(1){
+        // std::cout << "Czekam na graczy\n";
+        int poll_status = poll(poll_descriptors, 6, timeout);
+      // jeśi pojawił się jakiś gracz
+      if(poll_descriptors[0].revents & POLLIN){
+          int client_fd = accept(poll_descriptors[0].fd, NULL, NULL);
+          if(client_fd < 0){
+              std::cerr << "Błąd podczas akceptowania połączenia\n";
+              return 1;
+          }
+          std::cout << "Połączono z klientem\n";
+          std::string message = "BUSYNESS\r\n";
+          int bytes_sent = send(client_fd, message.c_str(), message.length(), 0);
+          // sendmessage(client_fd, message);
+        //   close(client_fd);
+
+      }
+    }
+    // do{
+
+    //     // zerujemy zdarzenie, które zaszły na deskryptorach
+    //     for(int i = 0; i < 6; i++){
+    //         poll_descriptors[i].revents = 0;
+    //     }
+
+    //     // czekamy na zdarzenia na deskryptorach
+    //     int poll_status = poll(poll_descriptors, 6, timeout);
+
+    //     if(poll_status < 0){
+    //         std::cerr << "Błąd podczas wywołania poll\n";
+    //         return 1;
+
+    //     }
+
+        // to znaczy, żę pojawiły się jakieś zdarzenia
+        // if(poll_status > 0){
+
+        //     // jeśli pojawiło się zdarzenia na głównym sockecie IPv4
+        //     if(poll_descriptors[0].revents & POLLIN){
+
+        //         // jeśli rozgrywka trwa, to od razu odsyłam busy
+        //         if(connected_players == 4){
+
+        //             int client_fd = accept(poll_descriptors[0].fd, NULL, NULL);
+        //             if(client_fd < 0){
+        //                 std::cerr << "Błąd podczas akceptowania połączenia\n";
+        //                 return 1;
+        //             }
+        //             std::string message = "BUSYNESW\r\n";
+        //             // sendmessage(client_fd, message);
+        //             close(client_fd);
+
+        //         }else if(/*w tablicy deskryptorów jest mniej niż 4*/){
+        //             // szukam wolnego miejsca w tablicy deskryptorów
+        //             // na każdym z tych deskryptorów ustawiam timeout
+        //             // albo go akceptuje albo odsyłam 
+
+        //         }
+
+        //     }
+
+            // jeśli pojawiła się jakaś wiadomość, na którymś z deskryptorów
+            // być może mogę zamknąć wtedy połączenie, a być możę będę miał już gotowego gracza
+    //     }
+
+    // }while(!finish);
+
+
+
+    // close(socket_fd_ipv4);
     close(socket_fd_ipv6);
     return 0;
 }
@@ -170,6 +260,13 @@ int Server::setupServerSocketIPv6(){
     int socket_fd = socket(AF_INET6, SOCK_STREAM, 0);
     if(socket_fd < 0){
         std::cerr << "Błąd podczas tworzenia gniazda\n";
+        return 1;
+    }
+
+    // Ustawienie gniazda, aby obsługiwało zarówno IPv6 jak i IPv4
+    int flag = 0;
+    if (setsockopt(socket_fd, IPPROTO_IPV6, IPV6_V6ONLY, (void *)&flag, sizeof(flag)) < 0) {
+        std::cerr << "Błąd podczas ustawiania opcji gniazda\n";
         return 1;
     }
 
