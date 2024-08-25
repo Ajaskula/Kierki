@@ -1,6 +1,19 @@
 #ifndef SERVER_H
 #define SERVER_H
 
+#define MAX_PLAYERS 4
+#define NREAD 0
+#define EREAD 1
+#define SREAD 2
+#define WREAD 3
+#define PREAD 4
+#define NWRITE 5
+#define EWRITE 6
+#define SWRITE 7
+#define WWRITE 8
+#define PWRITE 9
+#define CONNECTION_SOCKET 10
+
 #include <string>
 #include "common.h"
 #include "cards.h"
@@ -24,8 +37,8 @@ class Server{
         int calculateNumOfManInTrick(const std::string& trick);
         int checkIfKingOfHeartsInTrick(const std::string& trick);
         int readDealsFromFile(const std::string& filename);
-        int setupServerSocketIPv4();
-        int setupServerSocketIPv6();
+        int setupServerSocket();
+
 
     private:
         uint16_t port;

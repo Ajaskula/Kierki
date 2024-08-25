@@ -44,7 +44,7 @@ int Server::parseArguments(int argc, char* argv[], uint16_t& port, std::string& 
 
 
 Server::Server(uint16_t port, const std::string& file, int timeout)
-        : port(port), file(file), timeout(timeout), connected_players(0), gameplay(file), queue_length(5), is_E_connected(false), is_N_connected(false), is_S_connected(false), is_W_connected(false), current_trick(0)
+        : port(port), file(file), timeout(timeout * 1000), connected_players(0), gameplay(file), queue_length(5), is_E_connected(false), is_N_connected(false), is_S_connected(false), is_W_connected(false), current_trick(0)
         {}
 
 Server::~Server(){}
@@ -107,77 +107,120 @@ int Server::checkIfKingOfHeartsInTrick(const std::string& trick){
     // FIXME:: implement
     return 0;
 }
+int Server::calculateTimeToWait(int last_event_TRICK, int last_event_IAM) {
+    if (last_event_IAM == -1 && last_event_TRICK == -1) {
+        return -1;  // Jeśli żadne zdarzenie nie miało miejsca, zwróć -1
+    }
+
+    int timeout_ms = timeout;
+    if (last_event_IAM != -1) {
+        // Oblicz czas pozostały do timeoutu na otrzymanie IAM
+        int time_to_iam_timeout = timeout - std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - last_event_IAM).count();
+        timeout_ms = min(timeout_ms, time_to_iam_timeout);
+    }
+
+    if (last_event_TRICK != -1) {
+        // Oblicz czas pozostały do timeoutu na otrzymanie TRICK
+        int time_to_trick_timeout = timeout - std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - last_event_TRICK).count();
+        timeout_ms = min(timeout_ms, time_to_trick_timeout);
+    }
+
+    return max(0, timeout_ms);  // Upewnij się, że timeout nie jest ujemny
+}
 
 int Server::run(){
 
     // tworzę gniazdo obsługujące zarówno połączenia ipv4 jak i ipv6
-    int socket_fd_ipv6 = setupServerSocketIPv6();
-    if(socket_fd_ipv6 < 0){
+    int socket_fd = setupServerSocket();
+    if(socket_fd < 0){
         std::cerr << "Błąd podczas tworzenia gniazda IPv6\n";
         return 1;
     }
 
-    // tablica z deskryptorami klientów chcących rozegrać grę
-    struct pollfd poll_descriptors[6];
-    poll_descriptors[0].fd = socket_fd_ipv6;
-    poll_descriptors[0].events = POLLIN;
+    // numery deskryptorów
+    // O N E S W P N E S W P
+    // 0 1 2 3 4 5 6 7 8 9 10 
+    // deskryptor do zapisu jest oddalony o 5 od deskryptora do odczytu
+    // inicjalizacja tablicy deskryptorów
+    struct pollfd poll_descriptors[11];
+    poll_descriptors[CONNECTION_SOCKET].fd = socket_fd;
+    poll_descriptors[CONNECTION_SOCKET].events = POLLIN;
 
-    // pozostałe sockety, bądą obsługiwać połączenia z klientami
-    for(int i = 1; i < 6; i++){
+    // deskryptory na przyjmowanie wiadomości od klientów
+    for(int i = 0; i < 5; i++){
         poll_descriptors[i].fd = -1;
         poll_descriptors[i].events = POLLIN;
+    }
+    // deskryptory na zapisywanie do klientów
+    for(int i = 5; i < 10; i++){
+        poll_descriptors[i].fd = -1;
+        poll_descriptors[i].events = POLLOUT;
     }
     // tworzę bufory dla poszczególnych klientów i poczekalni
     // powinienem mieć dla każdego dwa deskryptory, deskryptor gotowy do odczytu
     // deskryptor gotowy do zapisu
     // O 
-    char buffer[6][BUFFER_SIZE];
+    char buffer[10][BUFFER_SIZE];
     // countery dla poszczególnych klientów
-    for(int i = 0; i < 6; i++){
+    for(int i = 0; i < 10; i++){
         // zeruję bufory
         memset(buffer[i], 0, BUFFER_SIZE);
     }
     // inicjalizacja liczników buforów dla klientów
-    size_t buffer_counter[6];
-    for(int i = 0; i < 6; i++){
+    size_t buffer_counter[10];
+    for(int i = 0; i < 10; i++){
         buffer_counter[i] = 0;
     }
-    auto last_event_timeN = std::chrono::steady_clock::now();
-    auto last_event_timeS = std::chrono::steady_clock::now();
-    auto last_event_timeW = std::chrono::steady_clock::now();
-    auto last_event_timeE = std::chrono::steady_clock::now();
-    auto last_event_timeWaiting = std::chrono::steady_clock::now();
-
-    // orgument opsiujący wyłożone przez kolejnych użytkoników karty
+    int last_event_TRICK = -1;
+    int last_event_IAM = -1;
     // TODO: implement errors in poll
     std::string lined_cards = "";
     bool finish = false;
+    int time_to_wait = -1;
     while(finish == false){
 
         // zerujemy wydarzenia dla wszystkich deskryptorów
-        for(int i = 0; i < 6; i++){
+        for(int i = 0; i < 11; i++){
             poll_descriptors[i].revents = 0;
         }
 
         // czekam na zdarzenia maksymalnie timout
         //TODO implement timeout
         // TODO implement not readeing at once
-        int poll_status = poll(poll_descriptors, 6, -1);
+        int time_to_wait = calcualteTimeToWait(last_event_TRICK, last_event_IAM);
+        int poll_status = poll(poll_descriptors, 6, time_to_wait);
         // arguement na 
 
-        // jeśli nie ma nikogo w poczeklani to przyjmuje połączenie i przerzucam osobnika na poczekalnie
-        if(poll_descriptors[0].revents & POLLIN && poll_descriptors[0].fd != -1){
+        // jeśli przyszło nowe połączenie, a nie ma nikogo w poczekalni
+        if(poll_descriptors[CONNECTION_SOCKET].revents & POLLIN && poll_descriptors[PREAD].fd != -1){
 
             // najpierw akceptuje połączenie z tym klientem
-            int waiting_room = accept(socket_fd_ipv6, NULL, NULL);
-            // aktualizuje czas ostatniego zdarzenia
-            last_event_timeWaiting = std::chrono::steady_clock::now();
+            int waiting_room_fd = accept(socket_fd, NULL, NULL);
             if(waiting_room < 0){
                 std::cerr << "Błąd podczas akceptowania połączenia\n";
                 return 1;
             }
+            // aktualizuje czas ostatniego zdarzenia IAM
+            last_event_IAM = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now()).count();
             // dodaję deskryptor do tablicy
-            poll_descriptors[5].fd = waiting_room;
+            poll_descriptors[PREAD].fd = waiting_room_fd;
+            poll_descriptors[PWRITE].fd = waiting_room_fd;
+        }
+
+        // jeśli ktoś jest w poczekalni
+        if(poll_descriptors[PREAD].fd != -1){
+
+            // sprawdzam czy nie przysłał mi wiadomości
+            if(poll_descriptors[PREAD].revents & POLLIN){
+
+                // odczytuje wiadomość
+            }
+
+            // jeśli mam coś do zapisania do klienta
+            if(){
+
+            }
+
         }
 
         // sprawdzam czy coś dzieje się w poczeklani
@@ -240,45 +283,8 @@ int Server::run(){
     return 0;
 }
 
-int Server::setupServerSocketIPv4(){
-    std::cout << "Próbuje utworzyć gniazdo\n";
-    
-    int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if(socket_fd < 0){
-        std::cerr << "Błąd podczas tworzenia gniazda\n";
-        return 1;
-    }
 
-    struct sockaddr_in server_address;
-    server_address.sin_family = AF_INET;
-    server_address.sin_addr.s_addr = htonl(INADDR_ANY);
-    server_address.sin_port = htons(port);
-
-    // próbuje bindować gniazdo do konkretnego adresu
-    if(bind(socket_fd, (struct sockaddr*)&server_address, (socklen_t) sizeof(server_address)) < 0){
-        std::cerr << "Błąd podczas bindowania gniazda\n";
-        return 1;
-    }
-
-    if(listen(socket_fd, queue_length) < 0){
-        std::cerr << "Błąd podczas nasłuchiwania na gnieździe\n";
-        return 1;
-    }
-
-
-    // sprawdźmy jaki port został wybrany
-    socklen_t length = (socklen_t) sizeof server_address;
-    if (getsockname(socket_fd, (struct sockaddr*) &server_address, &length) < 0){
-        std::cerr << "Błąd podczas pobierania numeru portu\n";
-        return 1;
-    }
-    std::cout << "Serwer nasłuchuje na porcie: " << ntohs(server_address.sin_port) << "\n";
-
-    return socket_fd;
-}
-
-
-int Server::setupServerSocketIPv6(){
+int Server::setupServerSocket(){
     std::cout << "Próbuje utworzyć gniazdo\n";
 
     int socket_fd = socket(AF_INET6, SOCK_STREAM, 0);
