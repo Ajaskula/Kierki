@@ -22,6 +22,7 @@ int main(int argc, char *argv[]){
 
     Klient klient(host, port, IPv4, IPv6, position, isBot);
     int ret_value = klient.run();
+    std::cout << "Zakończenie klienta" << std::endl;
 
 
     return ret_value;

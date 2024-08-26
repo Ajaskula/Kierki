@@ -444,7 +444,7 @@ int Klient::connectToServer(){
 int Klient::run(){
 
     socket_fd = connectToServer();
-    if(socket_fd == -1){
+    if(socket_fd < 0){
         std::cerr << "Nie udało się nawiązać połączenia\n";
         return 1;
     }
@@ -474,7 +474,7 @@ int Klient::run(){
         if(fds[0].revents & POLLIN){
             ssize_t bytes_received = read(socket_fd, &buffer[buffer_index], 1);
 
-            if(bytes_received == -1){
+            if(bytes_received < 0){
                 std::cerr << "Błąd podczas odbierania wiadomości\n";
                 close(socket_fd);
                 return 1;
