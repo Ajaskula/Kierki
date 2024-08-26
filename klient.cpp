@@ -450,7 +450,8 @@ int Klient::run(){
     }
     std::string local_address = get_local_address(socket_fd);
     std::string server_address = get_server_address(socket_fd);
-
+    //FIXME: sleep(10) do usunięcia;
+    // sleep(10);
     std::string message = std::string("IAM") + position + "\r\n";
     send_message(socket_fd, message);
     

@@ -31,8 +31,6 @@ class Server{
         static int parseArguments(int argc, char* argv[], uint16_t& port, std::string& file, int& timeout);
         int run();
         bool validateTRICK(const std::string& message);
-        // tasuje talię i rozdaje karty
-        std::vector<std::string> shuffleAndCreateDeals();
         int pointsInTrick(const std::string& trick);
         int calculateNumOfHeartsInTrick(const std::string& trick);
         int calculateNumOfQueensInTrick(const std::string& trick);
@@ -51,7 +49,9 @@ class Server{
         void responseToIAM(const std::string& message, struct pollfd fds[11]);
         void send_message(int fd, const std::string& message);
         void wypisz_zdarzenia(struct pollfd fds[11]);
-        int setupServerSocketIPv4();
+        bool areAllPlayersConnected();
+        int get_next_player();
+        int getPlayerfromChar(char player);
 
     private:
         uint16_t port;
@@ -87,5 +87,13 @@ class Server{
         std::vector<std::string> cards_on_hand_S;
         std::vector<std::string> cards_on_hand_W;
         std::vector<std::string> cards_on_hand_E;
+        int current_deal_number;
+        int number_of_deals_to_play;
+        CardSet cards_of_player_N;
+        CardSet cards_of_player_S;
+        CardSet cards_of_player_W;
+        CardSet cards_of_player_E;
+        // std::vector<char> players = {'N', 'E', 'S', 'W'};
+        int current_player;
 };
 #endif // SERVER_H

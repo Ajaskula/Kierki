@@ -238,3 +238,16 @@ Deal::Deal(char type, char firstPlayer, const std::string& dealN, const std::str
 }
 Deal::~Deal(){
 }
+Deal Gameplay::getDeal(int dealNumber){
+    return dealsToPlay[dealNumber];
+}
+int Gameplay::getNumberOfDeals(){
+    return dealsToPlay.size();
+}
+
+char Deal::getType(){
+    return type;
+}
+char Deal::getFirstPlayer(){
+    return firstPlayer;
+}

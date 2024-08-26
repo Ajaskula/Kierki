@@ -65,13 +65,15 @@ class Deal{
         Deal(char type, char firstPlayer, const std::string& dealN, const std::string& dealE, const std::string& dealS, const std::string& dealW);
         ~Deal();
 
-    private:
         char type;
         char firstPlayer;
         std::string dealN;
         std::string dealE;
         std::string dealS;
         std::string dealW;
+        char getType();
+        char getFirstPlayer();
+    private:
 };
 
 // klasa rozgrywki, definiowana
@@ -81,12 +83,16 @@ class Gameplay{
     public:
         Gameplay(const std::string& filename);
         ~Gameplay();
+        // zwraca rozdanie o wskazanym numerze
+        Deal getDeal(int dealNumber);
+        int getNumberOfDeals();
 
     private:
         // nazwa pliku, na podstawie, którego będzie tworzona rozgrywka
         std::string filename;
         std::vector<Deal> dealsToPlay;
         void createDealsFromFile();
+
 };
 
 
