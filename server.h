@@ -52,6 +52,7 @@ class Server{
         bool areAllPlayersConnected();
         int get_next_player();
         int getPlayerfromChar(char player);
+        void takeCardAwayFromPlayer(const std::string& card);
 
     private:
         uint16_t port;

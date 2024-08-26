@@ -335,6 +335,7 @@ int Server::run(){
         std::cerr << "Błąd podczas tworzenia gniazda\n";
         return 1;
     }
+    bool first_send = true;
     // bierząca rozgrywka
     bool time_to_deal = true;
     Deal current_deal = gameplay.getDeal(current_deal_number);
@@ -356,8 +357,8 @@ int Server::run(){
         // TODO implement not readeing at once
         int time_to_wait = calculateTimeToWait();
         int poll_status = poll(poll_descriptors, 11, time_to_wait);
-        wypisz_zdarzenia(poll_descriptors);
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        // wypisz_zdarzenia(poll_descriptors);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
         if(poll_status < 0){
             std::cerr << "Błąd podczas poll\n";
             return 1;
@@ -437,30 +438,81 @@ int Server::run(){
             }
 
             // wypisuje karty wszystkich graczy
-            if(areAllPlayersConnected()){
-                std::cout << "Karty gracza N: " << cards_of_player_N.getCardsOnHand() << "\n";
-                std::cout << "Karty gracza E: " << cards_of_player_E.getCardsOnHand() << "\n";
-                std::cout << "Karty gracza S: " << cards_of_player_S.getCardsOnHand() << "\n";
-                std::cout << "Karty gracza W: " << cards_of_player_W.getCardsOnHand() << "\n";
-            }
+            // if(areAllPlayersConnected()){
+            //     std::cout << "Karty gracza N: " << cards_of_player_N.getCardsOnHand() << "\n";
+            //     std::cout << "Karty gracza E: " << cards_of_player_E.getCardsOnHand() << "\n";
+            //     std::cout << "Karty gracza S: " << cards_of_player_S.getCardsOnHand() << "\n";
+            //     std::cout << "Karty gracza W: " << cards_of_player_W.getCardsOnHand() << "\n";
+            // }
 
             
             // tricking era
             if(areAllPlayersConnected()){
                 
                 // teraz proszę każdego z graczy o trick
-                std::string message = "TRICK" + std::to_string(current_trick);
-                for(int i = 0; i < 4; i++){
+                std::string message = "TRICK" + std::to_string(current_trick) + lined_cards + "\r\n";
+                for(int i = 0; i < 4;){
                     // proszę o trick każdego z kolejnych graczy
-                    send_message(poll_descriptors[current_player + 1].fd, message + "\r\n");
-
-                    // czekam na odpowiedź
-                    if(0){
-
+                    if(first_send == true){
+                    send_message(poll_descriptors[current_player + 6].fd, message);
+                    first_send = false;
                     }
 
+                    // czekam na odpowiedź od konkretnego gracza
+                    if(poll_descriptors[current_player + 1].revents & POLLIN){
+                        // odczytuje wiadomość od tego gracza bajt po bajcie
+                        ssize_t bytes_received = read(poll_descriptors[current_player + 1].fd, buffer[current_player + 1] + buffer_counter[current_player + 1], 1);
+                        if(bytes_received < 0){
+                            std::cerr << "Błąd podczas odczytywania wiadomości\n";
+                            close(poll_descriptors[current_player + 1].fd);
+                            return 1;
+                        }
+                        if(bytes_received == 0){
+                            close(poll_descriptors[current_player + 1].fd);
+                            return 1;
+                        }
+                        char received_char = buffer[current_player + 1][buffer_counter[current_player + 1]];
+                        std::cout << "Otrzymałem od gracza wiadomość: " << received_char << "\n";
+                        buffer_counter[current_player + 1] += 1;
+                        if(received_char == '\n'){
+                            if(buffer_counter[current_player + 1] > 1 && buffer[current_player + 1][buffer_counter[current_player + 1] - 2] == '\r'){
+                                std::string message(buffer[current_player + 1], buffer_counter[current_player + 1]);
+                                // otrzymałem taką właśnie wiadomość trick
+                                //FIXME: sprawdź czy jest ona zgodna z zasadami gry, na razie po prostu ją weź
+                                
+                                // dostałem dobrą kartę
+                                if(true){
+                                    // dodaję kartę do lined_cards
+                                    std::cout << "Otrzymałem od serwera wiadomość:" << message;
+                                    std::string card = extract_cards_from_TRICK(message);
+                                    std::cout<< "Karta: " << card << "\n";
+                                    lined_cards += card;
+                                    // zabieram kartę z ręki gracza
+                                    takeCardAwayFromPlayer(card);
+                                    first_send = true;
+                                    
+                                // wyślij wrong
+                                }else{
+
+                                }
+                                // czyszcze bufor nadawczy tego gracza
+                                memset(buffer[current_player + 1], 0, BUFFER_SIZE);
+                                buffer_counter[current_player + 1] = 0;
+                                if(first_send == true){
+                                    current_player = get_next_player();
+                                    first_send = true;
+                                    i++;
+                                }
+                                
+                            } // buffer_counter > 1 && buffer[buffer_counter - 2] == '\r'
+                        }// received_char == '\n'
+                    }
+                
+                // if(first_send == true){
+                //     current_trick += 1;
+                //     lined_cards = "";
+                // }
                 }
-                current_trick += 1;
                 
             }
 
@@ -490,6 +542,26 @@ int Server::getPlayerfromChar(char current_player){
         default:
             return -1;
     }
+}
+
+void Server::takeCardAwayFromPlayer(const std::string& card){
+    switch(current_player){
+        case 0:
+            cards_of_player_N.removeCard(Card::stringToCard(card));
+            break;
+        case 1:
+            cards_of_player_E.removeCard(Card::stringToCard(card));
+            break;
+        case 2:
+            cards_of_player_S.removeCard(Card::stringToCard(card));
+            break;
+        case 3:
+            cards_of_player_W.removeCard(Card::stringToCard(card));
+            break;
+        default:
+            break;
+    }
+
 }
 
 
