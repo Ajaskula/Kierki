@@ -118,42 +118,6 @@ bool is_valid_request_to_send_card(const std::string& input) {
     // Sprawdzenie, czy ciąg pasuje do wzorca
     return std::regex_match(input, pattern);
 }
-
-std::string extract_cards_from_TRICK(const std::string& input) {
-    // Wyrażenie regularne do zidentyfikowania części z kartami
-    std::regex pattern(R"(TRICK\d+((?:\d{1,2}|[JQKA])[CSDH]+)\r\n)");
-    std::smatch matches;
-
-    // Sprawdź, czy ciąg pasuje do wzorca i wyciągnij listę kart
-    if (std::regex_search(input, matches, pattern) && matches.size() > 1) {
-        std::string card_list = matches[1].str();
-        std::string result;
-
-        // Iteruj przez listę kart i formatuj je poprawnie
-        for (size_t i = 0; i < card_list.size();) {
-            std::string card;
-
-            // Sprawdź, czy karta to "10"
-            if (i + 1 < card_list.size() && card_list[i] == '1' && card_list[i + 1] == '0') {
-                card = card_list.substr(i, 3); // karta "10X"
-                i += 3;
-            } else {
-                card = card_list.substr(i, 2); // karta "VX"
-                i += 2;
-            }
-
-            // Dodaj kartę do wyniku
-            if (!result.empty()) {
-                result += ", ";
-            }
-            result += card;
-        }
-
-        return result;
-    }
-
-    return ""; // Zwróć pusty ciąg, jeśli format nie pasuje
-}
 std::string get_busy_places_from_BUSY(const std::string& message){
     std::string busy_places;;
     for(std::string::size_type i = 4; i < message.length() - 2; i++){
@@ -308,4 +272,14 @@ std::string format_card_list(const std::string& card_list) {
         formatted << card_list.substr(i, 2);  // Bierzemy dwuznakową kartę
     }
     return formatted.str();
+}
+
+std::string get_list_of_cards_from_TRICK(const std::string& trick, int current_trick) {
+
+    std::vector<std::string> cards = Card::extractCardsVectorFromCardsStringStr(trick.substr(6 + (current_trick >= 10), trick.length() - 8 - (current_trick >= 10)));
+    std::string cards_str;
+    for(std::string card : cards){
+        cards_str += card + ", ";
+    }
+    return cards_str.substr(0, cards_str.length() - 2);
 }

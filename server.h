@@ -31,7 +31,7 @@ class Server{
         static int parseArguments(int argc, char* argv[], uint16_t& port, std::string& file, int& timeout);
         int run();
         bool validateTRICK(const std::string& message);
-        int pointsInTrick(const std::string& trick);
+        // int pointsInTrick(const std::string& trick, int type);
         int calculateNumOfHeartsInTrick(const std::string& trick);
         int calculateNumOfQueensInTrick(const std::string& trick);
         int calculateNumOfManInTrick(const std::string& trick);
@@ -53,6 +53,8 @@ class Server{
         int get_next_player();
         int getPlayerfromChar(char player);
         void takeCardAwayFromPlayer(const std::string& card);
+        int whoTakeTrick(int first_player, const std::string& trick);
+        char getCharOfPlayer(int player);
 
     private:
         uint16_t port;
@@ -96,5 +98,8 @@ class Server{
         CardSet cards_of_player_E;
         // std::vector<char> players = {'N', 'E', 'S', 'W'};
         int current_player;
+        int pointsInDeal[4] = {0, 0, 0, 0};
+        int pointsInTotal[4] = {0, 0, 0, 0};
+
 };
 #endif // SERVER_H

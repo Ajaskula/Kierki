@@ -158,10 +158,12 @@ bool Klient::validateDEAL(const std::string& message){
 bool Klient::validateTRICK(const std::string& message){
     if(message.length() < 8 || message.length() > 18){
         
+        std::cerr << "Zła długość wiadomości\n";
         return false;
     }
     if(message.substr(0, 5) != "TRICK"){
         
+        std::cerr << "Zły początek wiadomości\n";
         return false;
     }
 
@@ -174,6 +176,7 @@ bool Klient::validateTRICK(const std::string& message){
             trick_number += message[6] - '0';
 
         }else{
+            std::cerr << "Zły numer lewy1\n";
             return false;
         }
 
@@ -182,27 +185,33 @@ bool Klient::validateTRICK(const std::string& message){
         if(isdigit(message[5])){
             trick_number = message[5] - '0';
         }else{
+            std::cerr << "Zły numer lewy2\n";
             return false;
         }
     }
 
     if(trick_number != current_trick){
+        std::cerr << "Zły numer lewy3\n";
         return false;
     }
 
     // sprawdzenie listy kart, czy zawiera poprawne karty
-    if(!is_string_correct_card_list(message.substr(7 - (trick_number >= 10), message.length() - 8 - (trick_number >= 10)))){
+    if(!is_string_correct_card_list(message.substr(6 + (trick_number >= 10), message.length() - 8 - (trick_number >= 10)))){
+        std::cerr << "trick_number: " << trick_number << "\n";  
+        std::cerr << "Zła lista kart\n";
         return false;
     }
-    std::vector<std::string> cards_vec = Card::extractCardsVectorFromCardsStringStr(message.substr(7 - (trick_number >= 10), message.length() - 8 - (trick_number >= 10)));
+    std::vector<std::string> cards_vec = Card::extractCardsVectorFromCardsStringStr(message.substr(6 + (trick_number >= 10), message.length() - 8 - (trick_number >= 10)));
     
     if(cards_vec.size() >= 4){
+        std::cerr << "Za dużo kart\n";
         return false;
     }
 
     // muszę jeszcze sprawdzić, czy nie posiadam takiej karty jak te wyłożone na stole
     for(std::vector<std::string>::size_type i = 0; i < cards_vec.size(); i++){
         if(cardSet.isCardInSet(Card::stringToCard(cards_vec[i]))){
+            std::cerr << "Posiadam kartę z lewy\n";
             return false;
         }
     }
@@ -497,6 +506,8 @@ int Klient::run(){
                 if(buffer_index > 1 && buffer[buffer_index - 2] == '\r'){
                     std::string message(buffer, buffer_index);
                     if(isBot){
+                        std::cout << "Otrzymana wiadomość: " + message + "\n";
+                        std::cout << "Długość wiadomości: " << message.length() << "\n";
                         raport(server_address, local_address, message);
                     }
                     // jeśli jestem na etapie oczekiwania na wiadomość DEAL lub BUSY
@@ -523,12 +534,12 @@ int Klient::run(){
                             got_TRICK = true;
                             wait_first_TRICK = false;
 
+                            std::cout << "Dostałem wiadomość TRICK\n";
                             // wypisuje instrukcję dla zawodnika
                             if(!isBot){
-                                std::cout << "Trick: (" << current_trick << ") " + extract_cards_from_TRICK(message) + "\n";
+                                std::cout << "Trick: (" << current_trick << ") " + get_list_of_cards_from_TRICK(message, current_trick) + "\n";
                                 std::cout << "Available: " + cardSet.getCardsOnHand() + "\n";
                             }else{
-                                
                                 Card card = cardSet.getCardOfColor(get_first_card_color_from_TRICK(message));
                                 std::string to_send = "TRICK" + std::to_string(current_trick) + card.rankToString(card.getRank()) + card.getColor() + "\r\n";
                                 send_message(socket_fd, to_send);
