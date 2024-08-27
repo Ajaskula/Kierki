@@ -78,6 +78,22 @@ void raport(const std::string& addr1, const std::string& addr2, const std::strin
     std::cout.write(str.c_str(), length);
 }
 
+// int make_socket_non_blocking(int sockfd) {
+//     int flags = fcntl(sockfd, F_GETFL, 0);
+//     if (flags == -1) {
+//         perror("fcntl(F_GETFL)");
+//         return -1;
+//     }
+
+//     flags |= O_NONBLOCK;
+//     if (fcntl(sockfd, F_SETFL, flags) == -1) {
+//         perror("fcntl(F_SETFL)");
+//         return -1;
+//     }
+
+//     return 0;
+// }
+
 bool is_string_correct_card_list(const std::string& hand) {
     // zbiór do przechowywanie unikalnych kart
     std::set<std::string> unique_cards; // Zbiór do przechowywania unikalnych kart

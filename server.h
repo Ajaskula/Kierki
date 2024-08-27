@@ -63,6 +63,12 @@ class Server{
         std::string prepareTotalMessage();
         std::string prepareScoreMessage();
         void closeAllDescriptors(struct pollfd fds[11]);
+        int manConnectionSocket(int socket_fd, struct pollfd fds[11]);
+        int manWaitingRoom(struct pollfd fds[11], char buffer[11][BUFFER_SIZE], size_t buffer_counter[11]);
+        void dealCardsToPlayers(struct pollfd fds[11]);
+        void reset_deals_sent();
+        std::string getProperDeal(char player);
+        std::string getDealCardsForPlayer(char type);
 
 
     private:
@@ -84,10 +90,6 @@ class Server{
         std::chrono::steady_clock::time_point time_point_IAM;
         std::chrono::steady_clock::time_point time_point_TRICK;
         // triczki przyjęte przez konkretnego gracza
-        std::vector<std::string> tricks_taken_N;
-        std::vector<std::string> tricks_taken_S;
-        std::vector<std::string> tricks_taken_W;
-        std::vector<std::string> tricks_taken_E;
         // rozdanie dla konkretnego gracza
         std::vector<std::string> deal_N;
         std::vector<std::string> deal_S;
@@ -100,10 +102,10 @@ class Server{
         std::vector<std::string> cards_on_hand_W;
         std::vector<std::string> cards_on_hand_E;
         int current_deal_number;
-        CardSet cards_of_player_N;
-        CardSet cards_of_player_S;
-        CardSet cards_of_player_W;
-        CardSet cards_of_player_E;
+        // CardSet cards_of_player_N;
+        // CardSet cards_of_player_S;
+        // CardSet cards_of_player_W;
+        // CardSet cards_of_player_E;
         // std::vector<char> players = {'N', 'E', 'S', 'W'};
         int current_player;
         int pointsInDeal[4] = {0, 0, 0, 0};
@@ -116,7 +118,12 @@ class Server{
         bool time_to_deal;
         Deal current_deal;
         int number_of_deals_to_play;
+        bool deals_sent[4] = {false, false, false, false};
         // bool finish;
+        int player_receiving_deal;
+        std::vector<CardSet> cards_of_players;
+        int current_player_receiving_trick;
+        bool trick_sent[4] = {false, false, false, false};
 
 };
 #endif // SERVER_H

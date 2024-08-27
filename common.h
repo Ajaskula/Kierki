@@ -15,6 +15,9 @@
 #include "cards.h"
 #include <regex>
 #include <set>
+#include <fcntl.h>
+
+#define MESSAGE_LIMIT 1000
 
 std::string get_current_time();
 std::string get_server_address(int socket_fd);
@@ -33,6 +36,8 @@ char get_first_card_color_from_TRICK(const std::string& message);
 std::string convert_taken_message(const std::string& taken_message);
 std::string format_card_list(const std::string& card_list); 
 std::string get_list_of_cards_from_TRICK(const std::string& trick, int current_trick);
+// int make_socket_non_blocking(int sockfd);
+
 
 
 #endif // COMMON_H

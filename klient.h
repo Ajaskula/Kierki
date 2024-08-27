@@ -15,7 +15,6 @@
 #include "common.h"
 
 // limit na rozmiar wiadomości
-#define MESSAGE_LIMIT 1000
 #define BUSY 1
 #define DEAL 2
 #define TRICK 3
