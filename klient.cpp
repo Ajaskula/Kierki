@@ -545,6 +545,7 @@ int Klient::run(){
                                 send_message(socket_fd, to_send);
                             }
                         }else if(validateMessage(message) == TAKEN){
+                            std::cout << "Dostałem wiadomość TAKEN\n";
                             // tylko jeśli czekam wciąż na pierwszego tricka
                             if(wait_first_TRICK || got_TRICK){
                                 if(!isBot){

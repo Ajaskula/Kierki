@@ -15,6 +15,7 @@ int main(int argc, char *argv[]){
     Server server(port, file, timeout);
     int ret_value = server.run();
 
-    std::cout << "Serwer zakończył działanie\n";
+    // std::cout << "Serwer zakończył działanie\n";
     return ret_value;
+    // return 0;
 }

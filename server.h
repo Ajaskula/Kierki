@@ -40,11 +40,11 @@ class Server{
         int setupServerSocket();
         int calculateTimeToWait();
         int validateIAM(const std::string& message);
-        void realiseWaitingRoom(struct pollfd fds[11], char buffer[10][BUFFER_SIZE], size_t buffer_counter[10]);
+        void realiseWaitingRoom(struct pollfd fds[11], char buffer[11][BUFFER_SIZE], size_t buffer_counter[11]);
         std::string busyPlacesToString();
         void assignClientToPlace(const std::string& message, struct pollfd* fds);
         void initialize_poll_descriptors(int socket_fd, struct pollfd* fds);
-        void initializeBuffers(char buffer[10][1024], size_t buffer_counter[10]);
+        void initializeBuffers(char buffer[11][1024], size_t buffer_counter[11]);
         void reset_revents(struct pollfd fds[11]);
         void responseToIAM(const std::string& message, struct pollfd fds[11]);
         void send_message(int fd, const std::string& message);
@@ -55,6 +55,15 @@ class Server{
         void takeCardAwayFromPlayer(const std::string& card);
         int whoTakeTrick(int first_player, const std::string& trick);
         char getCharOfPlayer(int player);
+        void zeroPointsInDeal();
+        void wypisz_punkty();
+        void addPointsToPlayer(int player, int points);
+        void addTakenToHistory(const std::string& trick);
+        void zeroTakenHistory();
+        std::string prepareTotalMessage();
+        std::string prepareScoreMessage();
+        void closeAllDescriptors(struct pollfd fds[11]);
+
 
     private:
         uint16_t port;
@@ -91,7 +100,6 @@ class Server{
         std::vector<std::string> cards_on_hand_W;
         std::vector<std::string> cards_on_hand_E;
         int current_deal_number;
-        int number_of_deals_to_play;
         CardSet cards_of_player_N;
         CardSet cards_of_player_S;
         CardSet cards_of_player_W;
@@ -100,6 +108,15 @@ class Server{
         int current_player;
         int pointsInDeal[4] = {0, 0, 0, 0};
         int pointsInTotal[4] = {0, 0, 0, 0};
+        std::vector<std::string> takenHistory;
+        // tutaj nowe
+        bool first_send;
+        int how_many_added_card;
+        int first_player_in_current_trick;
+        bool time_to_deal;
+        Deal current_deal;
+        int number_of_deals_to_play;
+        // bool finish;
 
 };
 #endif // SERVER_H

@@ -72,6 +72,7 @@ std::string get_local_address(int socket_fd) {
     return local_address;
 }
 void raport(const std::string& addr1, const std::string& addr2, const std::string& message){
+    std::cout << "raport: \n";
     std::string str =  "[" + addr1 + "," + addr2 +","+ get_current_time() + "] " + message;
     size_t length = str.length();
     std::cout.write(str.c_str(), length);

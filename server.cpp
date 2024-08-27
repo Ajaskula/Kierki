@@ -51,7 +51,9 @@ Server::Server(uint16_t port, const std::string& file, int timeout)
         : port(port), file(file), timeout(timeout * 1000), connected_players(0), gameplay(file), 
         queue_length(10), is_E_connected(false), is_N_connected(false), is_S_connected(false), is_W_connected(false), current_trick(1),
         last_event_IAM(-1), last_event_TRICK(-1), lined_cards(""), finish(false), time_point_IAM(), time_point_TRICK(), current_deal_number(0),
-        number_of_deals_to_play(gameplay.getNumberOfDeals()), cards_of_player_N(), cards_of_player_S(), cards_of_player_W(), cards_of_player_E()
+        cards_of_player_N(), cards_of_player_S(), cards_of_player_W(), cards_of_player_E(),
+        takenHistory(), first_send(true), how_many_added_card(0), first_player_in_current_trick(-1), time_to_deal(true), current_deal(gameplay.getDeal(current_deal_number)),
+        number_of_deals_to_play(gameplay.getNumberOfDeals())
         {}
 
 Server::~Server(){}
@@ -199,7 +201,6 @@ int Server::whoTakeTrick(int first_player, const std::string& trick){
     return (first_player + max_card_number) % 4;
 }
 int Server::calculateNumOfHeartsInTrick(const std::string& trick){
-    //FIXME:: implement
     int number_of_hearts = 0;
     std::vector<std::string> cards = Card::extractCardsVectorFromCardsStringStr(trick);
     for(std::string card : cards){
@@ -211,7 +212,6 @@ int Server::calculateNumOfHeartsInTrick(const std::string& trick){
     return number_of_hearts;
 }
 int Server::calculateNumOfQueensInTrick(const std::string& trick){
-    // FIXME:: implement
     int sum_of_points = 0;
     std::vector<std::string> cards = Card::extractCardsVectorFromCardsStringStr(trick);
     for(std::string card : cards){
@@ -222,7 +222,6 @@ int Server::calculateNumOfQueensInTrick(const std::string& trick){
     return sum_of_points;
 }
 int Server::calculateNumOfManInTrick(const std::string& trick){
-    //FIXME:: implement
     int sum_of_points = 0;
     std::vector<std::string> cards = Card::extractCardsVectorFromCardsStringStr(trick);
     for(std::string card : cards){
@@ -233,7 +232,6 @@ int Server::calculateNumOfManInTrick(const std::string& trick){
     return sum_of_points;
 }
 int Server::checkIfKingOfHeartsInTrick(const std::string& trick){
-    // FIXME:: implement
     std::vector<std::string> cards = Card::extractCardsVectorFromCardsStringStr(trick);
     for(std::string card : cards){
         if(card == "KH"){
@@ -383,40 +381,29 @@ bool Server::areAllPlayersConnected(){
 }
 
 int Server::run(){
-
     int socket_fd = setupServerSocket();
     if(socket_fd < 0){
         std::cerr << "Błąd podczas tworzenia gniazda\n";
         return 1;
     }
-    bool first_send = true;
-    int how_many_added_card = 0;
-    // bierząca rozgrywka
-    int first_player_in_current_trick = -1;
-    bool time_to_deal = true;
-    Deal current_deal = gameplay.getDeal(current_deal_number);
-    int current_deal_number = 0;
-    int number_of_deals_to_play = gameplay.getNumberOfDeals();
 
-    // numery deskryptorów
-    // O N E S W P N E S W P
-    // 0 1 2 3 4 5 6 7 8 9 10 
     char buffer[11][BUFFER_SIZE] = {0};
-    size_t buffer_counter[11];
-    struct pollfd poll_descriptors[11];
+    size_t buffer_counter[11] = {0};
+    struct pollfd poll_descriptors[11] = {0};
     initialize_poll_descriptors(socket_fd, poll_descriptors);
     initializeBuffers(buffer, buffer_counter);
     
     // TODO: implement errors in poll
-    bool finish = false;
-     while(finish == false){
+    //TODO implement timeout
+    // TODO implement not readeing at once
+    // bool finish = false;
+    do{
+
         reset_revents(poll_descriptors);
-        //TODO implement timeout
-        // TODO implement not readeing at once
         int time_to_wait = calculateTimeToWait();
         int poll_status = poll(poll_descriptors, 11, time_to_wait);
         // wypisz_zdarzenia(poll_descriptors);
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        // std::this_thread::sleep_for(std::chrono::milliseconds(100));
         if(poll_status < 0){
             std::cerr << "Błąd podczas poll\n";
             return 1;
@@ -506,7 +493,7 @@ int Server::run(){
 
             
             // tricking era
-            if(areAllPlayersConnected() && how_many_added_card < 4){
+            if(areAllPlayersConnected() && how_many_added_card < 4 && current_trick <= 13){
                 
                 // teraz proszę każdego z graczy o trick
                 std::string message = "TRICK" + std::to_string(current_trick) + lined_cards + "\r\n";
@@ -531,7 +518,7 @@ int Server::run(){
                         return 1;
                     }
                     char received_char = buffer[current_player + 1][buffer_counter[current_player + 1]];
-                    std::cout << "Otrzymałem od gracza wiadomość: " << received_char << "\n";
+                    // std::cout << "Otrzymałem od gracza wiadomość: " << received_char << "\n";
                     buffer_counter[current_player + 1] += 1;
                     if(received_char == '\n'){
                         if(buffer_counter[current_player + 1] > 1 && buffer[current_player + 1][buffer_counter[current_player + 1] - 2] == '\r'){
@@ -576,23 +563,54 @@ int Server::run(){
 
                 int how_many_point_in_trick = pointsInTrick(lined_cards, current_deal.getType() - '0');
                 std::cout << "Punkty w tricku: " << how_many_point_in_trick << "\n";
+                std::string taken_message = "TAKEN" + std::to_string(current_trick) + lined_cards + getCharOfPlayer(who_takes_current_trick) + "\r\n";
                 for(int i = 0; i < 4; i++){
-                    // send_message(poll_descriptors[i + 6].fd, "TAKEN" + std::to_string(pointsInTrick(lined_cards, 7)) + "\r\n");
+                    send_message(poll_descriptors[i + 6].fd, taken_message);
                 }
                 // dodaje jeden do numeru rozdania, jeśli wysłałem taken
+                addPointsToPlayer(who_takes_current_trick, how_many_point_in_trick);
+                addTakenToHistory(taken_message);
+                wypisz_punkty();
+                
                 current_trick += 1;
                 lined_cards = "";
                 how_many_added_card = 0;
                 
-                return 1;
+                // return 1;
             }
 
             // jeśli rozdanie się skończyło wysyłam score i total
             if(current_trick == 14){
+
+                // przygotuj score i total
+                std::string score_message = prepareScoreMessage();
+                std::string total_message = prepareTotalMessage();
+
+                // wyślij score i total
+                for(int i = 0; i < 4; i++){
+                    send_message(poll_descriptors[i + 6].fd, score_message);
+                    send_message(poll_descriptors[i + 6].fd, total_message);
+                }
+
                 
+
+                // zero points in deal
+                zeroPointsInDeal();
+                // wyzeruj histore lew
+                zeroTakenHistory();
+                // przejdź do następnego rozdania
+                current_deal_number += 1;
+                // resetuj numer lewy
+                current_trick = 1;
+                // zaznacz, że jest to czas na rozdanie
+                time_to_deal = true;
 
                 // jeśli gameplay się skończył to rozłączam klientów
                 if(current_deal_number == number_of_deals_to_play){
+                    finish = true;
+                    closeAllDescriptors(poll_descriptors);
+                }else{
+                    current_deal = gameplay.getDeal(current_deal_number);
                 }
 
             }
@@ -600,16 +618,76 @@ int Server::run(){
         }// poll status > 0
 
          
-    }// while
+    }while(finish == false);
 
     // zamykam gniazdo, rozgrywka zakończona prawidłowo
-    close(socket_fd);
+    std::cout << "koniec rozgrywki\n";
+    // close(socket_fd);
     return 0;
 }
 
+void Server::closeAllDescriptors(struct pollfd poll_descriptors[11]){
+    // zamykam główne gniazdo
+    close(poll_descriptors[CONNECTION_SOCKET].fd);
+    for(int i = 1; i < 6; i++){
+        if(poll_descriptors[i].fd != -1){
+            close(poll_descriptors[i].fd);
+            close(poll_descriptors[i + 5].fd);
+        }
+    }
+}
+std::string Server::prepareScoreMessage(){
+    std::string message = "SCORE";
+    for(int i = 0; i < 4; i++){
+        message += getCharOfPlayer(i);
+        message += std::to_string(pointsInDeal[i]);
+    }
+    message += "\r\n";
+    return message;
+}
+std::string Server::prepareTotalMessage(){
+    std::string message = "TOTAL";
+    for(int i = 0; i < 4; i++){
+        message += getCharOfPlayer(i);
+        message += std::to_string(pointsInTotal[i]);
+    }
+    message += "\r\n";
+    return message;
+}
+
+void Server::zeroTakenHistory(){
+    takenHistory.clear();
+}
 
 int Server::get_next_player(){
     return (current_player + 1) % 4;
+}
+
+void Server::addTakenToHistory(const std::string& taken){
+    takenHistory.push_back(taken);
+}
+
+void Server::addPointsToPlayer(int player, int points){
+    pointsInDeal[player] += points;
+    pointsInTotal[player] += points;
+}
+void Server::wypisz_punkty(){
+    std::cout << "Punkty w rozdaniu: ";
+    for(int i = 0; i < 4; i++){
+        std::cout << pointsInDeal[i] << " ";
+    }
+    std::cout << "\n";
+    std::cout << "Punkty w sumie: ";
+    for(int i = 0; i < 4; i++){
+        std::cout << pointsInTotal[i] << " ";
+    }
+    std::cout << "\n";
+}
+
+void Server::zeroPointsInDeal(){
+    for(int i = 0; i < 4; i++){
+        pointsInDeal[i] = 0;
+    }
 }
 
 int Server::getPlayerfromChar(char current_player){
@@ -660,6 +738,7 @@ void Server::takeCardAwayFromPlayer(const std::string& card){
     }
 
 }
+
 
 
 
