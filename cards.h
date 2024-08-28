@@ -53,10 +53,10 @@ class CardSet{
         void removeCard(Card card);
         // add to the set cards from the string
         void addCardsFromCardsString(const std::string& cards);
+        std::vector<Card> cards;
     private:
         // initialize full deck of cards
         void initializeFullDeck();
-        std::vector<Card> cards;
 };
 
 // klasa rozdania, definiowana poprzez elementy pliku

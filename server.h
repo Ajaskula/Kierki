@@ -69,6 +69,9 @@ class Server{
         void reset_deals_sent();
         std::string getProperDeal(char player);
         std::string getDealCardsForPlayer(char type);
+        void disconnectPlayer(int player);
+        bool checkIfPlayerCanPlayCard(const std::string& card);
+        bool checkIfPlayerHasCard(const std::string& card);
 
 
     private:
@@ -102,17 +105,11 @@ class Server{
         std::vector<std::string> cards_on_hand_W;
         std::vector<std::string> cards_on_hand_E;
         int current_deal_number;
-        // CardSet cards_of_player_N;
-        // CardSet cards_of_player_S;
-        // CardSet cards_of_player_W;
-        // CardSet cards_of_player_E;
-        // std::vector<char> players = {'N', 'E', 'S', 'W'};
         int current_player;
         int pointsInDeal[4] = {0, 0, 0, 0};
         int pointsInTotal[4] = {0, 0, 0, 0};
         std::vector<std::string> takenHistory;
         // tutaj nowe
-        bool first_send;
         int how_many_added_card;
         int first_player_in_current_trick;
         bool time_to_deal;
@@ -124,6 +121,8 @@ class Server{
         std::vector<CardSet> cards_of_players;
         int current_player_receiving_trick;
         bool trick_sent[4] = {false, false, false, false};
+        int player_receiving_taken;
+        int player_receiving_score_and_total;
 
 };
 #endif // SERVER_H
