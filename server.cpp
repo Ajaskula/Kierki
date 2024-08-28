@@ -4,47 +4,35 @@
 #include <cinttypes>
 #include <thread>
 
-
+// chyba dobrze
 int Server::parseArguments(int argc, char* argv[], uint16_t& port, std::string& file, int& timeout){
     for(int i = 1; i < argc; i++){
         std::string arg = argv[i];
 
         if(arg == "-p" && i + 1 < argc){
-            port = std::stoi(argv[i + 1]);
+            port = read_port(argv[i + 1]);
             i++;
         } else if(arg == "-f" && i + 1 < argc){
 
             file = argv[i + 1];
             i++;
-            // std::cout << "Plik: " << file << "\n";
         }else if(arg == "-t" && i + 1 < argc){
             timeout = std::stoi(argv[i+1]);
             if(timeout < 1){
-                std::cerr << "Timeout musi być większy od 1\n";
+                std::cerr << "Timeout musi być większy= od 1\n";
                 return 1;
             }
             i++;
-            // std::cout << "Timeout: " << timeout << "\n";
         }else{
             std::cerr << "Nieznany parametr: " << arg << "\n";
-            // tutaj jeszcze się zastanowić czy na pewno kończyć program
             return 1;
         }
     }
 
-    // sprawdza czy został podany plik
     if(file.empty()){
         std::cerr << "Błąd parametr -f jest wymagany\n";
         return 1;
     }
-
-    if(port == 0){
-        std::cout << "Numer portu zostanie wybrany domyślnie przez funkcję bind.\n";
-    }
-
-    std::cout << "Plik: " << file << "\n";
-    std::cout << "Timeout: " << timeout << "\n";
-    std::cout << "port: " << port << "\n";
     return 0;
 }
 Server::Server(uint16_t port, const std::string& file, int timeout)
@@ -58,6 +46,7 @@ Server::Server(uint16_t port, const std::string& file, int timeout)
 
 Server::~Server(){}
 
+// dobrze
 void Server::send_message(int socket_fd, const std::string &message){
     size_t length = message.length();
     ssize_t bytes_sent = send(socket_fd, message.c_str(), length, 0);
@@ -69,20 +58,16 @@ void Server::send_message(int socket_fd, const std::string &message){
     }
     raport(get_local_address(socket_fd), get_server_address(socket_fd), message);
 }
-// funkcja sprawdzająca poprawność wiadomości IAM
+// dobrze
 int Server::validateIAM(const std::string& message){
-    std::cout << "Wiadomość IAM: " << message << "\n";
-    std::cout << "Trzecia litera wiadomości: " << message[3] << "\n";
     if(message.length() != 6){
         return -1;
     }
     if(message[3] != 'N' && message[3] != 'S' && message[3] != 'W' && message[3] != 'E'){
         return -1;
     }
-    std::cout << is_N_connected << " " << is_S_connected << " " << is_W_connected << " " << is_E_connected << "\n";
     // sprawdzam czy ten zawodnik jest akurat podłączony
     if(is_E_connected && (message[3] == 'E')){
-
         return 1;
     }
     if(is_N_connected && (message[3] == 'N')){
@@ -97,8 +82,8 @@ int Server::validateIAM(const std::string& message){
     // prawidłowe IAM na wolne miejsce
     return 0;
 }
+
 int Server::setupServerSocket(){
-    std::cout << "Próbuje utworzyć gniazdo\n";
 
     int socket_fd = socket(AF_INET6, SOCK_STREAM, 0);
     if(socket_fd < 0){
@@ -261,23 +246,26 @@ int Server::calculateTimeToWait() {
 
     return std::max(0, timeout_ms);  // Upewnij się, że timeout nie jest ujemny
 }
+// dobra funkcja
 std::string Server::busyPlacesToString(){
     std::string busy_places = "";
     if(is_N_connected){
         busy_places += "N";
     }
-    if(is_S_connected){
+    if(is_E_connected){
         busy_places += "E";
     }
-    if(is_W_connected){
+    if(is_S_connected){
         busy_places += "S";
     }
-    if(is_E_connected){
+    if(is_W_connected){
         busy_places += "W";
     }
     return busy_places;
 }
 void Server::assignClientToPlace(const std::string& message, struct pollfd poll_descriptors[11]){
+    std::cout << "Przypisuje klienta do miejsca\n";
+    std::cout << message << "\n";
     if(message[3] == 'N'){
         is_N_connected = true;
         poll_descriptors[NREAD].fd = poll_descriptors[PREAD].fd;
@@ -302,6 +290,7 @@ void Server::assignClientToPlace(const std::string& message, struct pollfd poll_
         poll_descriptors[EWRITE].fd = poll_descriptors[PWRITE].fd;
         std::cout << "Gracz E podłączony\n";
     }
+    std::cout << "wartościowania is_N_connected: " << is_N_connected << " is_S_connected: " << is_S_connected << " is_W_connected: " << is_W_connected << " is_E_connected: " << is_E_connected << "\n";
 }
 void Server::initialize_poll_descriptors(int socket_fd, struct pollfd poll_descriptors[11]) {
     // Zainicjalizuj gniazdo połączenia
@@ -369,7 +358,9 @@ void Server::responseToIAM(const std::string& message, struct pollfd poll_descri
                 send_message(poll_descriptors[PWRITE].fd, message);
             }
             // dopiero takiego zawodnika, który zna stan gry, przypisuje do miejsca
+            std::cout << "zajęte miejsca przed przypisaniem: " << busyPlacesToString() << "\n";
             assignClientToPlace(message, poll_descriptors);
+            std::cout << "zajęte miejsca po przypisaniu: " << busyPlacesToString() << "\n";
             break;
         case 1:// zajęte miejsce
             send_message(poll_descriptors[PWRITE].fd, "BUSY" + busyPlacesToString() + "\r\n");
@@ -379,7 +370,7 @@ void Server::responseToIAM(const std::string& message, struct pollfd poll_descri
             close(poll_descriptors[PREAD].fd);
     }
 }
-
+// dobrze
 bool Server::areAllPlayersConnected(){
     return is_N_connected && is_S_connected && is_W_connected && is_E_connected;
 }
@@ -483,7 +474,7 @@ int Server::run(){
             }
 
             
-            // trickujemy
+            // wysyłamy tricka do graczy
             if(areAllPlayersConnected() && how_many_added_card < 4 && current_trick <= 13 && player_receiving_deal == 4){
                 
                 // próba wysłania tricka
@@ -594,8 +585,8 @@ int Server::run(){
                 
             }
 
-            // jeśli zakończyliśmy rozdanie, wysyłamy wszystkim zawodnikom taken
-            if(how_many_added_card == 4 && player_receiving_deal == 4){
+            // wysyłam taken
+            if(areAllPlayersConnected() && (how_many_added_card == 4 && player_receiving_deal == 4)){
 
                 // próbuje wysłać taken do wszystkich zaczynając od pierwszego gracza
                 int who_takes_current_trick = whoTakeTrick(first_player_in_current_trick, "TRICK" + std::to_string(current_trick) + lined_cards + "\r\n");
@@ -650,8 +641,8 @@ int Server::run(){
                 
             }
 
-            // jeśli rozdanie się skończyło wysyłam score i total
-            if(current_trick == 14 && player_receiving_deal == 4){
+            // wysyłam score i total
+            if(areAllPlayersConnected() && current_trick == 14 && player_receiving_deal == 4){
 
                 // przygotuj score i total
                 std::string score_message = prepareScoreMessage();

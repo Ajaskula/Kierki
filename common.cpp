@@ -1,6 +1,28 @@
 #include "common.h"
 
 
+uint16_t read_port(char const *string) {
+    char *endptr;
+    errno = 0;
+    unsigned long port = strtoul(string, &endptr, 10);
+    if (errno != 0 || *endptr != 0 || port > UINT16_MAX) {
+        fatal("%s is not a valid port number", string);
+    }
+    return (uint16_t) port;
+}
+[[noreturn]] void fatal(const char* fmt, ...) {
+    va_list fmt_args;
+
+    fprintf(stderr, "\tERROR: ");
+
+    va_start(fmt_args, fmt);
+    vfprintf(stderr, fmt, fmt_args);
+    va_end(fmt_args);
+
+    fprintf(stderr, "\n");
+    exit(1);
+}
+
 std::string get_current_time() {
     auto now = std::chrono::system_clock::now();
     std::time_t now_time = std::chrono::system_clock::to_time_t(now);

@@ -8,17 +8,21 @@
 #include<chrono>
 #include<sstream>
 #include<iomanip>
-#include <arpa/inet.h>    // Dla inet_ntop
-#include <netinet/in.h>   // Dla sockaddr_in
-#include <sys/socket.h>   // Dla socket, connect
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
 #include <unistd.h> 
 #include "cards.h"
 #include <regex>
 #include <set>
 #include <fcntl.h>
+#include <cstdarg>
 
 #define MESSAGE_LIMIT 1000
 
+
+[[noreturn]] void fatal(const char* fmt, ...);
+uint16_t read_port(char const *string);
 std::string get_current_time();
 std::string get_server_address(int socket_fd);
 std::string get_local_address(int socket_fd);
