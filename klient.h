@@ -14,7 +14,6 @@
 #include "cards.h"
 #include "common.h"
 
-// limit na rozmiar wiadomości
 #define BUSY 1
 #define DEAL 2
 #define TRICK 3
@@ -31,18 +30,11 @@ class Klient{
         Klient(const std::string& host, uint16_t port, bool IPv4, bool IPv6,
         char position, bool isBot);
         ~Klient();
-        // metoda uruchamiająca klienta
         int run();
         static int parseArguments(int argc, char *argv[], std::string& host, uint16_t& port, bool& IPv4, bool& IPv6, char& position, bool& isBot);
-        bool validate_BUSY(const std::string& message);
-        bool validate_DEAL(const std::string& message);
-        void send_message(int socket_fd, const std::string& message);
-        int receive_message(int socket_fd);
-        void print_trick_history();
 
     private:
 
-        // atrybuty klienta
         std::string host;
         uint16_t port;
         bool IPv4;
@@ -58,10 +50,16 @@ class Klient{
         bool wait_first_TRICK;
         bool got_TRICK;
         int current_trick;
-
+        bool sending;
+        std::string messageToRaport;
+        int buffer_index;
+        int buffer_sending_counter;
+        bool validate_BUSY(const std::string& message);
+        bool validate_DEAL(const std::string& message);
+        void send_message(char buffer[1024], const std::string& message);
+        int receive_message(int socket_fd);
+        void print_trick_history();
         int connectToServer();
-        // bool is_valid_card(const std::string& card);
-        int validateMessage(const std::string& message);
         bool validateTRICK(const std::string& message);
         bool validateTAKEN(const std::string& message);
         bool validateWRONG(const std::string& message);

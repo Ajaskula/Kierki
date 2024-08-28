@@ -72,6 +72,7 @@ class Server{
         void disconnectPlayer(int player);
         bool checkIfPlayerCanPlayCard(const std::string& card);
         bool checkIfPlayerHasCard(const std::string& card);
+        void disconnectAllPlayers(struct pollfd fds[11]);
 
 
     private:

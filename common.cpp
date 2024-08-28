@@ -22,6 +22,20 @@ uint16_t read_port(char const *string) {
     fprintf(stderr, "\n");
     exit(1);
 }
+[[noreturn]] void syserr(const char* fmt, ...)
+{
+    va_list fmt_args;
+    int org_errno = errno;
+
+    fprintf(stderr, "\tERROR: ");
+
+    va_start(fmt_args, fmt);
+    vfprintf(stderr, fmt, fmt_args);
+    va_end(fmt_args);
+
+    fprintf(stderr, " (%d; %s)\n", org_errno, strerror(org_errno));
+    exit(1);
+}
 
 std::string get_current_time() {
     auto now = std::chrono::system_clock::now();
@@ -94,38 +108,18 @@ std::string get_local_address(int socket_fd) {
     return local_address;
 }
 void raport(const std::string& addr1, const std::string& addr2, const std::string& message){
-    std::cout << "raport: \n";
     std::string str =  "[" + addr1 + "," + addr2 +","+ get_current_time() + "] " + message;
     size_t length = str.length();
     std::cout.write(str.c_str(), length);
 }
 
-// int make_socket_non_blocking(int sockfd) {
-//     int flags = fcntl(sockfd, F_GETFL, 0);
-//     if (flags == -1) {
-//         perror("fcntl(F_GETFL)");
-//         return -1;
-//     }
-
-//     flags |= O_NONBLOCK;
-//     if (fcntl(sockfd, F_SETFL, flags) == -1) {
-//         perror("fcntl(F_SETFL)");
-//         return -1;
-//     }
-
-//     return 0;
-// }
 
 bool is_string_correct_card_list(const std::string& hand) {
-    // zbiór do przechowywanie unikalnych kart
-    std::set<std::string> unique_cards; // Zbiór do przechowywania unikalnych kart
+    std::set<std::string> unique_cards;
 
-    // przetwarzanie karty po karcie
     size_t i = 0;
     size_t hand_length = hand.length();
-    // int card_count = 0;
 
-    // dopóki nie przejdę przez cały string
     while (i < hand_length) {
         std::string card;
 
@@ -170,25 +164,35 @@ std::string get_busy_places_from_BUSY(const std::string& message){
 }
 std::string convert_total_message(const std::string& message) {
     // Tworzymy wynikowy strumień tekstowy
+    // std::cout << "wiadomość, która przyszła do convert_score_message: " << message << std::endl;
+
+    // Usuwamy prefiks "SCORE" oraz suffix "\r\n"
+    std::string input = message.substr(5, message.length() - 7);
+    std::vector<int> numbers;
+    std::vector<char> directions;
+    std::string number_str;
+    for (size_t i = 0; i < input.length(); ++i) {
+        if (std::isdigit(input[i])) {
+            number_str += input[i];  // Zbieranie cyfr do liczby
+        } else if (input[i] == 'N' || input[i] == 'E' || input[i] == 'W' || input[i] == 'S') {
+            if (!number_str.empty()) {
+                numbers.push_back(std::stoi(number_str));  // Konwersja zebranego ciągu cyfr na liczbę i dodanie do wektora
+                number_str.clear();  // Wyczyść number_str dla kolejnej liczby
+            }
+            directions.push_back(input[i]);  // Dodanie znaku kierunku do wektora
+        }
+    }
+    // Dodanie ostatniej liczby do wektora, jeśli jakaś pozostała
+    if (!number_str.empty()) {
+        numbers.push_back(std::stoi(number_str));
+    }
+
+
     std::ostringstream result;
-
-    // Dodajemy nagłówek
     result << "The total scores are:\n";
-
-    // Usuwamy prefiks "TOTAL" i końcowe "\r\n"
-    std::string clean_message = message.substr(5, message.length() - 7);
-
-    // Przetwarzamy poszczególne pary <miejsce><punkty>
-    for (size_t i = 0; i < clean_message.length(); i += 3) {
-        std::string position = clean_message.substr(i, 1);
-        std::string points = clean_message.substr(i + 1, 2);  // Pobieramy dokładnie 2 znaki
-
-        // Usuwamy wiodące zera z punktów
-        int numeric_points = std::stoi(points);  // Konwertujemy na liczbę, co automatycznie usunie wiodące zera
-        points = std::to_string(numeric_points); // Konwertujemy z powrotem na string
-
-        // Dodajemy miejsce i punkty do wynikowego komunikatu
-        result << position << " | " << points << "\n";
+    
+    for (size_t i = 0; i < numbers.size(); ++i) {
+        result << directions[i] << " | " << numbers[i] << "\n";
     }
 
     return result.str();
@@ -222,25 +226,35 @@ std::string extract_card_list_from_taken(const std::string& message) {
 
 std::string convert_score_message(const std::string& message) {
     // Tworzymy wynikowy strumień tekstowy
+    std::cout << "wiadomość, która przyszła do convert_score_message: " << message << std::endl;
+
+    // Usuwamy prefiks "SCORE" oraz suffix "\r\n"
+    std::string input = message.substr(5, message.length() - 7);
+    std::vector<int> numbers;
+    std::vector<char> directions;
+    std::string number_str;
+    for (size_t i = 0; i < input.length(); ++i) {
+        if (std::isdigit(input[i])) {
+            number_str += input[i];  // Zbieranie cyfr do liczby
+        } else if (input[i] == 'N' || input[i] == 'E' || input[i] == 'W' || input[i] == 'S') {
+            if (!number_str.empty()) {
+                numbers.push_back(std::stoi(number_str));  // Konwersja zebranego ciągu cyfr na liczbę i dodanie do wektora
+                number_str.clear();  // Wyczyść number_str dla kolejnej liczby
+            }
+            directions.push_back(input[i]);  // Dodanie znaku kierunku do wektora
+        }
+    }
+    // Dodanie ostatniej liczby do wektora, jeśli jakaś pozostała
+    if (!number_str.empty()) {
+        numbers.push_back(std::stoi(number_str));
+    }
+
+
     std::ostringstream result;
-
-    // Dodajemy nagłówek
     result << "The scores are:\n";
-
-    // Usuwamy prefiks "SCORE"
-    std::string clean_message = message.substr(5, message.length() - 7);
-
-    // Przetwarzamy poszczególne pary <miejsce><punkty>
-    for (size_t i = 0; i < clean_message.length(); i += 3) {
-        std::string position = clean_message.substr(i, 1);
-        std::string points = clean_message.substr(i + 1, 2);  // Pobieramy dokładnie 2 znaki
-
-        // Usuwamy wiodące zera z punktów
-        int numeric_points = std::stoi(points);  // Konwertujemy na liczbę, co automatycznie usunie wiodące zera
-        points = std::to_string(numeric_points); // Konwertujemy z powrotem na string
-
-        // Dodajemy miejsce i punkty do wynikowego komunikatu
-        result << position << " | " << points << "\n";
+    
+    for (size_t i = 0; i < numbers.size(); ++i) {
+        result << directions[i] << " | " << numbers[i] << "\n";
     }
 
     return result.str();
@@ -279,38 +293,48 @@ std::string convert_taken_message(const std::string& taken_message) {
     // Ignorujemy końcowe \r\n, usuwamy "TAKEN"
     std::string clean_message = taken_message.substr(5, taken_message.length() - 7);
 
-    // Wyciąganie numeru lewy
-    size_t start = 0;
-    size_t end = clean_message.find_first_not_of("0123456789");
-    std::string trick_number = clean_message.substr(start, end - start);
+    char player_position = clean_message.back(); 
+    clean_message = clean_message.substr(0, clean_message.length() - 1);
 
-    // Wyciąganie listy kart
-    start = end;
-    end = clean_message.find_first_of("NSWE", start);
-    std::string card_list = clean_message.substr(start, end - start);
-    
-    // Formatowanie listy kart
-    std::string formatted_card_list = format_card_list(card_list);
-
-    // Wyciąganie pozycji gracza
-    std::string player_position = clean_message.substr(end);
-
-    // Tworzenie wynikowego komunikatu
-    std::ostringstream result;
-    result << "A trick " << trick_number << " is taken by " << player_position
-           << ", cards " << formatted_card_list << ".";
-
-    return result.str();
-}
-std::string format_card_list(const std::string& card_list) {
-    std::ostringstream formatted;
-    for (size_t i = 0; i < card_list.length(); i += 2) {
-        if (i > 0) {
-            formatted << ", ";
+    std::string trick_number;
+    int first_color_index = 0;
+    for(std::string::size_type i = 0; i < clean_message.length(); i++){
+        if(clean_message[i] == 'H' || clean_message[i] == 'D' || clean_message[i] == 'S' || clean_message[i] == 'C'){
+            first_color_index = i;
+            break;
         }
-        formatted << card_list.substr(i, 2);  // Bierzemy dwuznakową kartę
     }
-    return formatted.str();
+
+    if(first_color_index == 2){
+        trick_number = clean_message.substr(0, 1);
+        clean_message = clean_message.substr(1, clean_message.length() - 1);
+    }
+    if(first_color_index == 4){
+        trick_number = clean_message.substr(0, 2);
+        clean_message = clean_message.substr(2, clean_message.length() - 2);
+    }
+    if(first_color_index == 3 && clean_message[2] != '0'){
+        trick_number = clean_message.substr(0, 2);
+        clean_message = clean_message.substr(2, clean_message.length() - 2);
+
+    }
+    if(first_color_index == 3 && clean_message[2] == '0'){
+        trick_number = clean_message.substr(0, 1);
+        clean_message = clean_message.substr(1, clean_message.length() - 1);
+
+    }
+        
+    std::vector<std::string> cards = Card::extractCardsVectorFromCardsStringStr(clean_message);
+    std::string cards_str;
+    for(std::string card : cards){
+        cards_str += card + ", ";
+    }
+    cards_str = cards_str.substr(0, cards_str.length() - 2);
+    std::string result;
+    result = "A trick " + trick_number + " is taken by " + player_position
+           + ", cards " + cards_str + ".";
+
+    return result;
 }
 
 std::string get_list_of_cards_from_TRICK(const std::string& trick, int current_trick) {

@@ -22,6 +22,7 @@
 
 
 [[noreturn]] void fatal(const char* fmt, ...);
+[[noreturn]] void syserr(const char* fmt, ...);
 uint16_t read_port(char const *string);
 std::string get_current_time();
 std::string get_server_address(int socket_fd);
