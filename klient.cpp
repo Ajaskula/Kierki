@@ -383,7 +383,6 @@ void Klient::performTaken(const std::string& message){
 
 }
 void Klient::send_message(char buffer[1024], const std::string &message){
-    std::cout << "Wiadomość w funkcji send_message: " << message << "\n";
     buffer_sending_counter = message.length();
     strcpy(buffer, message.c_str());
     messageToRaport = message;
@@ -408,12 +407,7 @@ int Klient::run(){
     send_message(sending_buffer, message);
 
 
-    // TODO implement non-blocking sending
-    // TODO mabye try to implement reading more than one byte at a time
-
     // TODO implement poll error handling
-    // TODO implement writing out correct message
-    // TODO check if writing out is as it should be, pay attention to stdout, and stderr
 
     while(true){
         for(int i = 0; i < 3; i++){ fds[i].revents = 0; }
@@ -462,7 +456,7 @@ int Klient::run(){
                             if(!isBot){
                                 std::cout << "New deal " << message[4] << ": starting place " << message[5] << ", your cards: " << cardSet.getCardsOnHand() <<".\n";
                             }
-                            // dodaje karty do tali
+                            
                             wait_DEAL = false;
                             wait_SCORE = true;
                             wait_TOTAL = true;
@@ -475,11 +469,12 @@ int Klient::run(){
                             got_TRICK = true;
                             wait_first_TRICK = false;
 
-                            // wypisuje instrukcję dla zawodnika
+                            // instrcutions for a player
                             if(!isBot){
                                 std::cout << "Trick: (" << current_trick << ") " + get_list_of_cards_from_TRICK(message, current_trick) + "\n";
                                 std::cout << "Available: " + cardSet.getCardsOnHand() + "\n";
                             }else{
+                                // bot actions
                                 Card card = cardSet.getCardOfColor(get_first_card_color_from_TRICK(message));
                                 std::string to_send = "TRICK" + std::to_string(current_trick) + card.rankToString(card.getRank()) + card.getColor() + "\r\n";
                                 send_message(sending_buffer, to_send);
@@ -500,8 +495,7 @@ int Klient::run(){
                                 }
                         }
                     
-                    // tutaj powinienem otrzymać SCORE i TOTAL
-                    // tutaj jest okej, bo mogę to otrzymać jedynie gdy curr_trick == 14
+                    // waiting for SCORE and TOTAL
                     }else{
                             if(validateSCORE(message)){
                                 if(!isBot){
@@ -519,13 +513,13 @@ int Klient::run(){
                                 wait_DEAL = true;
                             }
                         }
-                    // otrzymałem faktycznie wiadomość
+                    
                     buffer_index = 0;
                     memset(buffer, 0, 1024);
                 }
             }
         
-            // jeśli przekroczyłem limit długości wiadomości
+            // message too long
             if(buffer_index == MESSAGE_LIMIT){
                 buffer[buffer_index] = '\r';
                 buffer[buffer_index + 1] = '\n';
@@ -553,16 +547,15 @@ int Klient::run(){
 
         }
 
-        if(sending && fds[2].revents & POLLOUT){ // zapis
+        if(sending && fds[2].revents & POLLOUT){ // write to server
             ssize_t bytes_sent = send(fds[2].fd, sending_buffer, buffer_sending_counter, 0);
             if(bytes_sent < 0){
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    // Mimo że gniazdo zgłosiło POLLOUT, bufor może być pełny.
-                    // Można spróbować później.
+                    // Queue is full, try again later
                 } else if (errno == EINTR) {
-                    // Wywołanie zostało przerwane przez sygnał. Spróbuj ponownie.
+                    // Signal interupted the system call
                 } else {
-                    // Inny błąd, np. zerwanie połączenia.
+                    // error
                     close(fds[2].fd);
                     syserr("send");
                 }
