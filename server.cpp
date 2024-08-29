@@ -667,6 +667,7 @@ int Server::run(){
 
                                     // dostałem shit
                                     }else{
+                                        // powinienem tutaj rozłączyć gracza
                                         std::cout << "dostałem shit: " << message;
 
                                     }
@@ -811,7 +812,9 @@ int Server::run(){
          
     }while(finish == false);
 
+    std::cout << "Koniec gry\n";
     close(poll_descriptors[CONNECTION_SOCKET].fd);
+    std::cout << "Zamknięto gniazdo\n";
     return 0;
 }
 
@@ -961,7 +964,6 @@ int Server::manConnectionSocket(int socket_fd, struct pollfd poll_descriptors[11
     
     int waiting_room_fd = accept(socket_fd, NULL, NULL);
     
-    raport(getClientInfo(waiting_room_fd), std::to_string(port), "CONNECTED");
     if(waiting_room_fd < 0){
         std::cerr << "Błąd podczas akceptowania połączenia\n";
         return 1;
