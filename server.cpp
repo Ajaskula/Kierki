@@ -39,7 +39,7 @@ Server::Server(uint16_t port, const std::string& file, int timeout)
         : port(port), file(file), timeout(timeout * 1000), connected_players(0), gameplay(file), 
         queue_length(10), is_E_connected(false), is_N_connected(false), is_S_connected(false), is_W_connected(false), current_trick(1),
         last_event_IAM(-1), last_event_TRICK(-1), lined_cards(""), finish(false), time_point_IAM(), time_point_TRICK(), current_deal_number(0),
-        takenHistory(), how_many_added_card(0), first_player_in_current_trick(-1), current_deal(gameplay.getDeal(current_deal_number).getType(), gameplay.getDeal(current_deal_number).getFirstPlayer(), gameplay.getDeal(current_deal_number).dealN, gameplay.getDeal(current_deal_number).dealE, gameplay.getDeal(current_deal_number).dealS, gameplay.getDeal(current_deal_number).dealW),
+        takenHistory(), how_many_added_card(0), first_player_in_current_trick(-1), current_deal(),
         number_of_deals_to_play(gameplay.getNumberOfDeals()), player_receiving_deal(-1), cards_of_players(4, CardSet()), current_player_receiving_trick(-1),
         player_receiving_taken(0), player_receiving_score_and_total(0)
         {}

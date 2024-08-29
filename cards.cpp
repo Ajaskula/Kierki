@@ -229,6 +229,13 @@ void Gameplay::createDealsFromFile(){
     }
 }
 
+// Deal::Deal(const Deal& other)
+//     : type(other.type), firstPlayer(other.firstPlayer), dealN(other.dealN), dealE(other.dealE), dealS(other.dealS), dealW(other.dealW) {
+//     std::cout << "Copy constructor called" << std::endl;
+// }
+Deal::Deal() : type(' '), firstPlayer(' '), dealN(""), dealE(""), dealS(""), dealW("") {
+        std::cout << "Default constructor called" << std::endl;
+        }
 Deal::Deal(char type, char firstPlayer, const std::string& dealN, const std::string& dealE, const std::string& dealS, const std::string& dealW) : type(type), firstPlayer(firstPlayer), dealN(dealN), dealE(dealE), dealS(dealS), dealW(dealW) {
     std::cout << "Creating deal of type: " << type << " with first player: " << firstPlayer << std::endl;
     std::cout << "Deal for N: " << dealN << std::endl;

@@ -63,6 +63,8 @@ class CardSet{
 class Deal{
     public:
         Deal(char type, char firstPlayer, const std::string& dealN, const std::string& dealE, const std::string& dealS, const std::string& dealW);
+        // Deal(const Deal& other);
+        Deal();
         ~Deal();
 
         char type;
