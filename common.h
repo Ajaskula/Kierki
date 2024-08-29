@@ -17,6 +17,7 @@
 #include <set>
 #include <fcntl.h>
 #include <cstdarg>
+#include <string.h>
 
 #define MESSAGE_LIMIT 1000
 
