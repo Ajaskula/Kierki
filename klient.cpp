@@ -398,6 +398,7 @@ int Klient::run(){
     }
     std::string local_address = get_local_address(socket_fd);
     std::string server_address = get_server_address(socket_fd);
+    
     std::string message = std::string("IAM") + position + "\r\n";
     struct pollfd fds[3]; fds[0].fd = socket_fd;  fds[0].events = POLLIN; fds[1].fd = STDIN_FILENO;  fds[1].events = POLLIN;
     fds[2].fd = socket_fd; fds[2].events = POLLOUT;
@@ -405,9 +406,6 @@ int Klient::run(){
     char buffer[1024]; memset(buffer, 0, 1024);
 
     send_message(sending_buffer, message);
-
-
-    // TODO implement poll error handling
 
     while(true){
         for(int i = 0; i < 3; i++){ fds[i].revents = 0; }

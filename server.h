@@ -123,6 +123,7 @@ class Server{
         bool trick_sent[4] = {false, false, false, false};
         int player_receiving_taken;
         int player_receiving_score_and_total;
+        std::string local_address;
 
 };
 #endif // SERVER_H

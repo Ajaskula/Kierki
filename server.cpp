@@ -41,7 +41,7 @@ Server::Server(uint16_t port, const std::string& file, int timeout)
         last_event_IAM(-1), last_event_TRICK(-1), lined_cards(""), finish(false), time_point_IAM(), time_point_TRICK(), current_deal_number(0),
         takenHistory(), how_many_added_card(0), first_player_in_current_trick(-1), current_deal(),
         number_of_deals_to_play(gameplay.getNumberOfDeals()), player_receiving_deal(-1), cards_of_players(4, CardSet()), current_player_receiving_trick(-1),
-        player_receiving_taken(0), player_receiving_score_and_total(0)
+        player_receiving_taken(0), player_receiving_score_and_total(0), local_address()
         {}
 
 Server::~Server(){}
@@ -117,6 +117,18 @@ int Server::setupServerSocket(){
         close(socket_fd);
         return -1;
     }
+    // Ustawienie gniazda w tryb nieblokujący
+    int flags = fcntl(socket_fd, F_GETFL, 0);
+    if (flags < 0) {
+        std::cerr << "Błąd podczas pobierania flag gniazda\n";
+        close(socket_fd);
+        return -1;
+    }
+    if (fcntl(socket_fd, F_SETFL, flags | O_NONBLOCK) < 0) {
+        std::cerr << "Błąd podczas ustawiania trybu nieblokującego\n";
+        close(socket_fd);
+        return -1;
+    }
 
     // sprawdzam jaki port został wybrany
     socklen_t length = (socklen_t) sizeof server_address;
@@ -134,9 +146,6 @@ bool Server::validateTRICK(const std::string& message){
     return true;
 }
 int Server::pointsInTrick(const std::string& trick, int type){
-    std::cout << "Punkty w tricku\n";
-    std::cout << "Trick: " << trick << "\n";
-    std::cout << "Typ: " << type << "\n";
     int sum_of_points = 0;
     switch(type){
         case 1:
@@ -162,7 +171,6 @@ int Server::pointsInTrick(const std::string& trick, int type){
     return 0;
 }
 
-// decyduje, który gracz bierze trick
 int Server::whoTakeTrick(int first_player, const std::string& trick){
     
     std::cout << "Kto bierze trick\n";
@@ -171,7 +179,6 @@ int Server::whoTakeTrick(int first_player, const std::string& trick){
     std::cout << "Kolor pierwszej karty: " << first_card_color << "\n";
     std::vector<std::string> cards = Card::extractCardsVectorFromCardsStringStr(trick.substr(6 + (current_trick >= 10), trick.length() - 8 - (current_trick >= 10)));
     int max_card_number = 0;
-    // przechodzę przez wszystkie karty w tricku
     for(int i = 1; i < 4; i++){
         if(cards[i][cards[i].length() - 1] == first_card_color){
             if(Card::stringToRank(cards[i].substr(0, cards[i].length() - 1)) > Card::stringToRank(cards[max_card_number].substr(0, cards[max_card_number].length() - 1))){
@@ -361,6 +368,41 @@ void Server::responseToIAM(const std::string& message, struct pollfd poll_descri
             close(poll_descriptors[PREAD].fd);
     }
 }
+
+std::string get_local_address_server(int socket_fd) {
+    struct sockaddr_storage addr;
+    socklen_t addr_len = sizeof(addr);
+
+    if (getsockname(socket_fd, (struct sockaddr*)&addr, &addr_len) != 0) {
+        perror("getsockname failed");
+        return "";
+    }
+
+    char ip_str[INET6_ADDRSTRLEN];
+    std::string local_address;
+
+    if (addr.ss_family == AF_INET) {
+        struct sockaddr_in* s = (struct sockaddr_in*)&addr;
+        inet_ntop(AF_INET, &s->sin_addr, ip_str, sizeof(ip_str));
+        local_address = ip_str;
+        local_address += ":" + std::to_string(ntohs(s->sin_port));
+    } 
+    else if (addr.ss_family == AF_INET6) {
+        struct sockaddr_in6* s = (struct sockaddr_in6*)&addr;
+        inet_ntop(AF_INET6, &s->sin6_addr, ip_str, sizeof(ip_str));
+
+        // Check if the address is an IPv4-mapped IPv6 address
+        if (strncmp(ip_str, "::ffff:", 7) == 0) {
+            local_address = std::string(ip_str + 7);  // Skip the "::ffff:" prefix
+        } else {
+            local_address = ip_str;
+        }
+        
+        local_address += ":" + std::to_string(ntohs(s->sin6_port));
+    }
+    return local_address;
+}
+
 // dobrze
 bool Server::areAllPlayersConnected(){
     return is_N_connected && is_S_connected && is_W_connected && is_E_connected;
@@ -372,7 +414,12 @@ int Server::run(){
         std::cerr << "Błąd podczas tworzenia gniazda\n";
         return 1;
     }
-
+    if(gameplay.getNumberOfDeals() == 0){
+        // std::cerr << "Brak rozdań do gry\n";
+        return 0;
+    }
+    std::string local_address = get_local_address(socket_fd);
+    std::cout << "Adres lokalny: " << local_address << "\n";
     char buffer[11][BUFFER_SIZE] = {0};
     size_t buffer_counter[11] = {0};
     struct pollfd poll_descriptors[11];
@@ -380,7 +427,6 @@ int Server::run(){
     initializeBuffers(buffer, buffer_counter);
     current_deal = gameplay.getDeal(current_deal_number);
     
-    // TODO: implement errors in poll
     //TODO implement timeout
     // TODO implement not readeing at once
     do{
@@ -391,13 +437,16 @@ int Server::run(){
         // wypisz_zdarzenia(poll_descriptors);
         // std::this_thread::sleep_for(std::chrono::milliseconds(50));
         if(poll_status < 0){
-            std::cerr << "Błąd podczas poll\n";
-            return 1;
+            if (errno == EINTR) {
+                std::cerr << "interrupted system call\n";
+            }
+            else {
+                syserr("poll");
+            }
         }else{
         
             // nowe połączenie, obsługujemy jeśli nie ma nikogo w poczeklani
             if((poll_descriptors[CONNECTION_SOCKET].revents & POLLIN) && poll_descriptors[PREAD].fd == -1){
-                // biorę timestamp IM i wkładam do poczekalni
                 if(manConnectionSocket(socket_fd, poll_descriptors) == 1){
                     return 1;
                 }
@@ -406,7 +455,6 @@ int Server::run(){
             // ktoś jest w poczekalni, obsługujemy zawsze
             if(poll_descriptors[PREAD].fd != -1){ // ktoś jest w poczekalni
 
-                // 
                 if(manWaitingRoom(poll_descriptors, buffer, buffer_counter) == 1){
                     return 1;
                 }
@@ -817,9 +865,47 @@ std::string Server::getDealCardsForPlayer(char type){
 
 }
 
+std::string getClientInfo(int client_fd) {
+    struct sockaddr_storage client_address;
+    socklen_t client_address_len = sizeof(client_address);
+
+    if (getpeername(client_fd, (struct sockaddr*)&client_address, &client_address_len) < 0) {
+        std::cerr << "Błąd podczas pobierania informacji o kliencie\n";
+        return "";
+    }
+
+    char ip_str[INET6_ADDRSTRLEN]; // Zapas na adres IPv6, który jest dłuższy
+    int client_port;
+
+    if (client_address.ss_family == AF_INET) { // IPv4
+        struct sockaddr_in* s = (struct sockaddr_in*)&client_address;
+        client_port = ntohs(s->sin_port);
+        inet_ntop(AF_INET, &s->sin_addr, ip_str, sizeof(ip_str));
+    } else if (client_address.ss_family == AF_INET6) { // IPv6
+        struct sockaddr_in6* s = (struct sockaddr_in6*)&client_address;
+        client_port = ntohs(s->sin6_port);
+        inet_ntop(AF_INET6, &s->sin6_addr, ip_str, sizeof(ip_str));
+
+        // Sprawdzenie, czy adres IPv6 jest w formacie mapped IPv4 address
+        if (IN6_IS_ADDR_V4MAPPED(&s->sin6_addr)) {
+            // Konwersja do IPv4
+            struct in_addr ipv4_addr;
+            memcpy(&ipv4_addr, &s->sin6_addr.s6_addr[12], sizeof(ipv4_addr));
+            inet_ntop(AF_INET, &ipv4_addr, ip_str, sizeof(ip_str));
+        }
+    } else {
+        std::cerr << "Nieznany typ adresu\n";
+        return "";
+    }
+
+    // std::cout << "Połączono z klientem: " << ip_str << " na porcie: " << client_port << "\n";
+    return std::string(ip_str) + ":" + std::to_string(client_port);
+}
 int Server::manConnectionSocket(int socket_fd, struct pollfd poll_descriptors[11]){
     
     int waiting_room_fd = accept(socket_fd, NULL, NULL);
+    
+    raport(getClientInfo(waiting_room_fd), std::to_string(port), "CONNECTED");
     if(waiting_room_fd < 0){
         std::cerr << "Błąd podczas akceptowania połączenia\n";
         return 1;
