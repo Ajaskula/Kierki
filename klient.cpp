@@ -441,7 +441,7 @@ int Klient::run(){
                 if(buffer_index > 1 && buffer[buffer_index - 2] == '\r'){
                     std::string message(buffer, buffer_index);
                     if(isBot){
-                        raport(server_address, local_address, message);
+                        raport(get_server_address(fds[0].fd), get_local_address(fds[0].fd), message);
                     }
 
                     if(wait_DEAL){
@@ -522,7 +522,7 @@ int Klient::run(){
                 buffer[buffer_index] = '\r';
                 buffer[buffer_index + 1] = '\n';
                 if(isBot){
-                    raport(server_address, local_address, buffer);
+                    raport(get_server_address(fds[0].fd), get_local_address(fds[0].fd), buffer);
                 }
                 buffer_index = 0;
                 memset(buffer, 0, 1024);
@@ -565,7 +565,7 @@ int Klient::run(){
             if(buffer_sending_counter == 0){
                 sending = false;
                 if(isBot){
-                    raport(local_address, server_address, messageToRaport);
+                    raport(get_local_address(fds[0].fd), get_server_address(fds[0].fd), messageToRaport);
                 }
             }
         }

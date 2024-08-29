@@ -52,6 +52,7 @@ std::string get_server_address(int socket_fd) {
     struct sockaddr_storage addr;
     socklen_t addr_len = sizeof(addr);
 
+    // Pobieranie adresu serwera
     if (getpeername(socket_fd, (struct sockaddr*)&addr, &addr_len) != 0) {
         perror("getpeername failed");
         return "";
@@ -65,15 +66,28 @@ std::string get_server_address(int socket_fd) {
         struct sockaddr_in* s = (struct sockaddr_in*)&addr;
         inet_ntop(AF_INET, &s->sin_addr, ip_str, sizeof(ip_str));
         server_address = ip_str;
-        server_address += ":" + std::to_string(ntohs(s->sin_port));
     } 
     // Obsługa IPv6
     else if (addr.ss_family == AF_INET6) {
         struct sockaddr_in6* s = (struct sockaddr_in6*)&addr;
-        inet_ntop(AF_INET6, &s->sin6_addr, ip_str, sizeof(ip_str));
-        server_address = ip_str;
-        server_address += ":" + std::to_string(ntohs(s->sin6_port));
+        // Sprawdzanie, czy adres IPv6 jest mapowanym adresem IPv4
+        if (IN6_IS_ADDR_V4MAPPED(&s->sin6_addr)) {
+            struct in_addr ipv4_addr;
+            // Wyciąganie adresu IPv4 z mapowanego adresu IPv6
+            memcpy(&ipv4_addr, &s->sin6_addr.s6_addr[12], sizeof(ipv4_addr));
+            inet_ntop(AF_INET, &ipv4_addr, ip_str, sizeof(ip_str));
+            server_address = ip_str;
+        } else {
+            // W przypadku, gdy adres IPv6 nie jest mapowanym adresem IPv4
+            inet_ntop(AF_INET6, &s->sin6_addr, ip_str, sizeof(ip_str));
+            server_address = ip_str;
+        }
     }
+
+    // Dodawanie numeru portu do końca adresu
+    server_address += ":" + std::to_string(ntohs(((addr.ss_family == AF_INET) ? 
+        ((struct sockaddr_in*)&addr)->sin_port : 
+        ((struct sockaddr_in6*)&addr)->sin6_port)));
 
     return server_address;
 }
@@ -95,17 +109,34 @@ std::string get_local_address(int socket_fd) {
         struct sockaddr_in* s = (struct sockaddr_in*)&addr;
         inet_ntop(AF_INET, &s->sin_addr, ip_str, sizeof(ip_str));
         local_address = ip_str;
-        local_address += ":" + std::to_string(ntohs(s->sin_port));
     } 
     // Obsługa IPv6
     else if (addr.ss_family == AF_INET6) {
         struct sockaddr_in6* s = (struct sockaddr_in6*)&addr;
-        inet_ntop(AF_INET6, &s->sin6_addr, ip_str, sizeof(ip_str));
-        local_address = ip_str;
-        local_address += ":" + std::to_string(ntohs(s->sin6_port));
+        // Sprawdzanie, czy adres IPv6 jest mapowanym adresem IPv4
+        if (IN6_IS_ADDR_V4MAPPED(&s->sin6_addr)) {
+            struct in_addr ipv4_addr;
+            // Wyciąganie adresu IPv4 z mapowanego adresu IPv6
+            memcpy(&ipv4_addr, &s->sin6_addr.s6_addr[12], sizeof(ipv4_addr));
+            inet_ntop(AF_INET, &ipv4_addr, ip_str, sizeof(ip_str));
+            local_address = ip_str;
+        } else {
+            // W przypadku, gdy adres IPv6 nie jest mapowanym adresem IPv4
+            inet_ntop(AF_INET6, &s->sin6_addr, ip_str, sizeof(ip_str));
+            local_address = ip_str;
+        }
     }
+
+    // Dodawanie numeru portu do końca adresu
+    local_address += ":" + std::to_string(ntohs(((addr.ss_family == AF_INET) ? 
+        ((struct sockaddr_in*)&addr)->sin_port : 
+        ((struct sockaddr_in6*)&addr)->sin6_port)));
+
     return local_address;
 }
+
+
+
 void raport(const std::string& addr1, const std::string& addr2, const std::string& message){
     std::string str =  "[" + addr1 + "," + addr2 +","+ get_current_time() + "] " + message;
     size_t length = str.length();
