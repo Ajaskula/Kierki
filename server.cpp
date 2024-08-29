@@ -141,8 +141,52 @@ int Server::setupServerSocket(){
 
     return socket_fd;
 }
-bool Server::validateTRICK(const std::string& message){
-    //FIXME: implement
+bool Server::validateTRICK(const std::string& trick){
+    std::string message = trick;
+    std::cout << "Sprawdzam trick\n";
+    if(message.length() < 10 || message.length() > 12){
+        return false;
+    }
+    if(message.substr(0, 5) != "TRICK"){
+        return false;
+
+    }
+    message = message.substr(5, message.length() - 7);
+    std::cout << "Trick: " << message << "d\n";
+    // int trick_number = 0;
+
+    if(message[message.length() - 1] != 'C' && message[message.length() - 1] != 'D' && message[message.length() - 1] != 'H' && message[message.length() - 1] != 'S'){
+        return false;
+    }
+    message = message.substr(0, message.length() - 1);
+    std::cout << "Trick: " << message << "\n";
+    if(message[message.length() - 1] == '0'){
+        if(message[message.length() - 2] != '1'){
+            return false;
+        }
+        message = message.substr(0, message.length() - 2);
+
+    }else if(((message[message.length() - 1] <= '9' && message[message.length() - 1] >= '2') || message[message.length() - 1] == 'J' || message[message.length() - 1] == 'Q' || message[message.length() - 1] == 'K' || message[message.length() - 1] == 'A')){
+        message = message.substr(0, message.length() - 1);
+    }else{
+        return false;
+    }
+
+    if(message.length() == 0){
+        return false;
+    }
+    int trick_number = 0;
+    if(message.length() == 1){
+        trick_number = message[0] - '0';
+    }
+    if(message.length() == 2){
+        trick_number = 10 * (message[0] - '0');
+        trick_number += message[1] - '0';
+    }
+    if(trick_number < 1 || trick_number > 13){
+        return false;
+    }
+    std::cout << "zwracam true\n";
     return true;
 }
 int Server::pointsInTrick(const std::string& trick, int type){
@@ -418,8 +462,8 @@ int Server::run(){
         // std::cerr << "Brak rozdań do gry\n";
         return 0;
     }
-    std::string local_address = get_local_address(socket_fd);
-    std::cout << "Adres lokalny: " << local_address << "\n";
+    // std::string local_address = get_local_address(socket_fd);
+    // std::cout << "Adres lokalny: " << local_address << "\n";
     char buffer[11][BUFFER_SIZE] = {0};
     size_t buffer_counter[11] = {0};
     struct pollfd poll_descriptors[11];
@@ -598,21 +642,33 @@ int Server::run(){
                                 last_event_TRICK = -1;
                                 if(buffer_counter[current_player_receiving_trick + 1] > 1 && buffer[current_player_receiving_trick + 1][buffer_counter[current_player_receiving_trick + 1] - 2] == '\r'){
                                     std::string message(buffer[current_player_receiving_trick + 1], buffer_counter[current_player_receiving_trick + 1]);
+                                    
+                                    if(validateTRICK(message) == true){
                                         
-                                    std::string card = message.substr(6 + (current_trick >=10 ), message.length() - 8 - (current_trick >= 10));
-                                    if(checkIfPlayerCanPlayCard(card)){
+                                        std::string card = message.substr(6 + (current_trick >=10 ), message.length() - 8 - (current_trick >= 10));
+                                        if(checkIfPlayerCanPlayCard(card)){
 
-                                        trick_sent[current_player_receiving_trick] = false;
-                                        lined_cards += card;
-                                        takeCardAwayFromPlayer(card);
-                                        memset(buffer[current_player_receiving_trick + 1], 0, BUFFER_SIZE);
-                                        buffer_counter[current_player_receiving_trick + 1] = 0;
-                                        how_many_added_card += 1;
-                                        current_player_receiving_trick = get_next_player();
-                                        
+                                            trick_sent[current_player_receiving_trick] = false;
+                                            lined_cards += card;
+                                            takeCardAwayFromPlayer(card);
+                                            memset(buffer[current_player_receiving_trick + 1], 0, BUFFER_SIZE);
+                                            buffer_counter[current_player_receiving_trick + 1] = 0;
+                                            how_many_added_card += 1;
+                                            current_player_receiving_trick = get_next_player();
+
+                                        // dostałem prawie dobry trick 
+                                        }else{
+                                            std::cout << "prawie dobry trick\n";
+                                            send_message(poll_descriptors[current_player_receiving_trick + 6].fd, "WRONG" + std::to_string(current_trick) +"\r\n");
+                                            trick_sent[current_player_receiving_trick] = false;
+                                            memset(buffer[current_player_receiving_trick + 1], 0, BUFFER_SIZE);
+                                            buffer_counter[current_player_receiving_trick + 1] = 0;
+                                        }
+
+                                    // dostałem shit
                                     }else{
-                                        send_message(poll_descriptors[current_player_receiving_trick + 6].fd, "WRONG" + std::to_string(current_trick) +"\r\n");
-                                        trick_sent[current_player_receiving_trick] = false;
+                                        std::cout << "dostałem shit: " << message;
+
                                     }
                                         
                                 } // buffer_counter > 1 && buffer[buffer_counter - 2] == '\r'
