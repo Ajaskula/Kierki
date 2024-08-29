@@ -31,7 +31,6 @@ class Server{
         static int parseArguments(int argc, char* argv[], uint16_t& port, std::string& file, int& timeout);
         int run();
         bool validateTRICK(const std::string& message);
-        // int pointsInTrick(const std::string& trick, int type);
         int calculateNumOfHeartsInTrick(const std::string& trick);
         int calculateNumOfQueensInTrick(const std::string& trick);
         int calculateNumOfManInTrick(const std::string& trick);

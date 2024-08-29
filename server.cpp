@@ -39,7 +39,7 @@ Server::Server(uint16_t port, const std::string& file, int timeout)
         : port(port), file(file), timeout(timeout * 1000), connected_players(0), gameplay(file), 
         queue_length(10), is_E_connected(false), is_N_connected(false), is_S_connected(false), is_W_connected(false), current_trick(1),
         last_event_IAM(-1), last_event_TRICK(-1), lined_cards(""), finish(false), time_point_IAM(), time_point_TRICK(), current_deal_number(0),
-        takenHistory(), how_many_added_card(0), first_player_in_current_trick(-1), current_deal(gameplay.getDeal(current_deal_number)),
+        takenHistory(), how_many_added_card(0), first_player_in_current_trick(-1), current_deal(gameplay.getDeal(current_deal_number).getType(), gameplay.getDeal(current_deal_number).getFirstPlayer(), gameplay.getDeal(current_deal_number).dealN, gameplay.getDeal(current_deal_number).dealE, gameplay.getDeal(current_deal_number).dealS, gameplay.getDeal(current_deal_number).dealW),
         number_of_deals_to_play(gameplay.getNumberOfDeals()), player_receiving_deal(-1), cards_of_players(4, CardSet()), current_player_receiving_trick(-1),
         player_receiving_taken(0), player_receiving_score_and_total(0)
         {}
@@ -170,10 +170,6 @@ int Server::whoTakeTrick(int first_player, const std::string& trick){
     char first_card_color = get_first_card_color_from_TRICK(trick);
     std::cout << "Kolor pierwszej karty: " << first_card_color << "\n";
     std::vector<std::string> cards = Card::extractCardsVectorFromCardsStringStr(trick.substr(6 + (current_trick >= 10), trick.length() - 8 - (current_trick >= 10)));
-    // for(std::string card : cards){
-    //     std::cout << "Karta: " << card << "\n";
-    // }
-    // chcę znaleźć numer najtarszej karty w kolorze pierwszej karty
     int max_card_number = 0;
     // przechodzę przez wszystkie karty w tricku
     for(int i = 1; i < 4; i++){
@@ -382,6 +378,7 @@ int Server::run(){
     struct pollfd poll_descriptors[11];
     initialize_poll_descriptors(socket_fd, poll_descriptors);
     initializeBuffers(buffer, buffer_counter);
+    current_deal = gameplay.getDeal(current_deal_number);
     
     // TODO: implement errors in poll
     //TODO implement timeout

@@ -43,8 +43,8 @@ std::string get_current_time() {
     std::tm local_time = *std::localtime(&now_time);
     auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
     std::ostringstream oss;
-    oss << std::put_time(&local_time, "%Y-%m-%dT%H:%M:%S")    // Czas bez milisekund
-        << '.' << std::setw(3) << std::setfill('0') << now_ms.count();  // Milisekundy
+    oss << std::put_time(&local_time, "%Y-%m-%dT%H:%M:%S")
+        << '.' << std::setw(3) << std::setfill('0') << now_ms.count();
 
     return oss.str();
 }
@@ -52,7 +52,6 @@ std::string get_server_address(int socket_fd) {
     struct sockaddr_storage addr;
     socklen_t addr_len = sizeof(addr);
 
-    // Pobieranie adresu serwera
     if (getpeername(socket_fd, (struct sockaddr*)&addr, &addr_len) != 0) {
         perror("getpeername failed");
         return "";
