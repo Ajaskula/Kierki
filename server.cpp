@@ -41,7 +41,7 @@ Server::Server(uint16_t port, const std::string& file, int timeout)
         takenHistory(), how_many_added_card(0), first_player_in_current_trick(-1), current_deal(),
         number_of_deals_to_play(gameplay.getNumberOfDeals()), player_receiving_deal(-1), cards_of_players(4, CardSet()), current_player_receiving_trick(-1),
         player_receiving_taken(0), player_receiving_score_and_total(0), local_address(), messagesToSendFromWaitingRoom(),
-        assignFromWaitingRoom('B'), disconnectFromWaitingRoom(false), message_to_raport_from_waiting_room("")
+        assignFromWaitingRoom('B'), disconnectFromWaitingRoom(false), message_to_raport_from_waiting_room(""), score_sent(false)
         {}
 
 Server::~Server(){}
@@ -475,7 +475,6 @@ int Server::run(){
     initializeBuffers(buffer, buffer_counter);
     current_deal = gameplay.getDeal(current_deal_number);
     
-    //TODO implement timeout
     // TODO implement not readeing at once
     do{
 
@@ -516,57 +515,7 @@ int Server::run(){
             // dealuje karty
             if(areAllPlayersConnected() && player_receiving_deal < 4 && player_receiving_deal >= 0){
 
-                // jeśli w bufferze skierowanego do tego gracza nic nie ma
-                if(buffer_counter[player_receiving_deal + 6] == 0){
-
-                    std::string message = getProperDeal(getCharOfPlayer(player_receiving_deal));
-                    buffer_counter[player_receiving_deal + 6] = message.length();
-                    strcpy(buffer[player_receiving_deal + 6], message.c_str());
-
-                }
-
-                // próbuje wysłać deala do tego gracza
-                if(poll_descriptors[player_receiving_deal + 6].revents & POLLOUT){ // jest możliwość zapisu
-                    ssize_t bytes_sent = send(poll_descriptors[player_receiving_deal + 6].fd, buffer[player_receiving_deal + 6], buffer_counter[player_receiving_deal + 6], 0);
-                    // wystąpił błąd 
-                    if(bytes_sent < 0){
-
-                        if (errno == EPIPE || errno == ECONNRESET) {
-                            // Klient się rozłączył lub połączenie zostało zresetowane
-                            perror("send failed, disconnecting client");
-                            close(poll_descriptors[player_receiving_deal + 6].fd);
-                            poll_descriptors[player_receiving_deal + 6].fd = -1;
-                            poll_descriptors[player_receiving_deal + 1].fd = -1;
-                            buffer_counter[player_receiving_deal + 6] = 0;
-                            buffer_counter[player_receiving_deal + 1] = 0;
-                            memset(buffer[player_receiving_deal + 6], 0, BUFFER_SIZE);
-                            memset(buffer[player_receiving_deal + 6], 0, BUFFER_SIZE);
-                            disconnectPlayer(player_receiving_deal);
-
-                        } else if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                            perror("send would block, try again later");
-                        }
-                    
-                    // udało się wysłać niezerowe bajty
-                        }else{
-
-                            buffer_counter[player_receiving_deal + 6] -= bytes_sent;
-                            memmove(buffer[player_receiving_deal + 6], buffer[player_receiving_deal + 6] + bytes_sent, buffer_counter[player_receiving_deal + 6]);
-                        }
-                    // przesuwam bajty na początek bufora
-                }
-
-                if(buffer_counter[player_receiving_deal + 6] == 0 && poll_descriptors[player_receiving_deal + 6].fd != -1){
-                    // muszę dodać karty
-                    deals_sent[player_receiving_deal] = true;
-                    cards_of_players[player_receiving_deal].addCardsFromCardsString(getDealCardsForPlayer(getCharOfPlayer(player_receiving_deal)));
-                    player_receiving_deal += 1;
-                }
-                
-                if(player_receiving_deal == 4){
-                    first_player_in_current_trick = getPlayerfromChar(current_deal.getFirstPlayer());
-                    current_player_receiving_trick = getPlayerfromChar(current_deal.getFirstPlayer());
-                }
+                manageDealCards(poll_descriptors, buffer, buffer_counter);
             }
 
             
@@ -589,20 +538,19 @@ int Server::run(){
 
                     ssize_t bytes_sent = send(poll_descriptors[current_player_receiving_trick + 6].fd, buffer[current_player_receiving_trick + 6], buffer_counter[current_player_receiving_trick + 6], 0);
                     if(bytes_sent < 0){
-                        if (errno == EPIPE || errno == ECONNRESET) {
-                            // Klient się rozłączył lub połączenie zostało zresetowane
-                            perror("send failed, disconnecting client");
+                        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                            perror("send would block, try again later");
+                        }else if(errno == EPIPE || errno == ECONNRESET){
                             close(poll_descriptors[current_player_receiving_trick + 6].fd);
                             poll_descriptors[current_player_receiving_trick + 6].fd = -1;
                             poll_descriptors[current_player_receiving_trick + 1].fd = -1;
                             buffer_counter[current_player_receiving_trick + 6] = 0;
-                            buffer_counter[current_player_receiving_trick + 1] = 0;
-                            memset(buffer[current_player_receiving_trick + 6], 0, BUFFER_SIZE);
                             memset(buffer[current_player_receiving_trick + 6], 0, BUFFER_SIZE);
                             disconnectPlayer(current_player_receiving_trick);
-
-                        } else if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                            perror("send would block, try again later");
+                        }else{
+                            disconnectAllPlayers(poll_descriptors);
+                            close(poll_descriptors[CONNECTION_SOCKET].fd);
+                            syserr("write");
                         }
                     }else{
                         buffer_counter[current_player_receiving_trick + 6] -= bytes_sent;
@@ -696,119 +644,14 @@ int Server::run(){
             // wysyłam taken
             if(areAllPlayersConnected() && (how_many_added_card == 4 && player_receiving_deal == 4)){
 
-                // próbuje wysłać taken do wszystkich zaczynając od pierwszego gracza
-                std::cout << "trick message to send: " << "TRICK" + std::to_string(current_trick) + lined_cards + "\r\n";
-                int who_takes_current_trick = whoTakeTrick(first_player_in_current_trick, "TRICK" + std::to_string(current_trick) + lined_cards + "\r\n");
-                std::cout << "who takes current trick: " << who_takes_current_trick << "\n";
-                    std::cout << "Kto bierze trick: " << getCharOfPlayer(who_takes_current_trick) << "\n";
-                    std::string message = "TAKEN" + std::to_string(current_trick) + lined_cards + getCharOfPlayer(who_takes_current_trick) + "\r\n";
-
-                // jeśli w bufferze skierowanego do tego gracza nic nie ma
-                if(buffer_counter[player_receiving_taken + 6] == 0){
-                    buffer_counter[player_receiving_taken + 6] = message.length();
-                    strcpy(buffer[player_receiving_taken + 6], message.c_str());
-                }
-
-                // próbuje wystawić taken do gracza
-                if(poll_descriptors[player_receiving_taken + 6].revents & POLLOUT){ // jeśli jest możliwość zapisu
-                    ssize_t bytes_sent = send(poll_descriptors[player_receiving_taken + 6].fd, buffer[player_receiving_taken + 6], buffer_counter[player_receiving_taken + 6], 0);
-                    if(bytes_sent < 0){
-                        std::cerr << "Błąd podczas wysyłania taken\n";
-                        close(poll_descriptors[player_receiving_taken + 6].fd);
-                        return 1;
-                    }
-                    // ziomeczek się rozłączył
-                    if(bytes_sent == 0){
-                        close(poll_descriptors[player_receiving_taken + 6].fd);
-                        poll_descriptors[player_receiving_taken + 6].fd = -1;
-                        poll_descriptors[player_receiving_taken + 1].fd = -1;
-                        buffer_counter[player_receiving_taken + 6] = 0;
-                        memset(buffer[player_receiving_taken + 6], 0, BUFFER_SIZE);
-                        disconnectPlayer(player_receiving_taken);
-                    }
-                    // przesuwam bajty na początek bufora
-                    buffer_counter[player_receiving_taken + 6] -= bytes_sent;
-                    memmove(buffer[player_receiving_taken + 6], buffer[player_receiving_taken + 6] + bytes_sent, buffer_counter[player_receiving_taken + 6]);
-                }
-
-                // udało się wysłać taken do gracza
-                if(buffer_counter[player_receiving_taken + 6] == 0 && poll_descriptors[player_receiving_taken + 6].fd != -1){
-                    player_receiving_taken += 1;
-                }
-                
-                // po wysłaniu taken do wszystkich
-                if(player_receiving_taken == 4){
-                    int how_many_point_in_trick = pointsInTrick(lined_cards, current_deal.getType() - '0');
-                    addPointsToPlayer(who_takes_current_trick, how_many_point_in_trick);
-                    addTakenToHistory(message);
-                    current_trick += 1;
-                    first_player_in_current_trick = who_takes_current_trick;
-                    current_player_receiving_trick = first_player_in_current_trick;
-                    lined_cards = "";
-                    how_many_added_card = 0;
-                    player_receiving_taken = 0;
-                }
+               manageSendingTaken(poll_descriptors, buffer, buffer_counter);
                 
             }
 
             // wysyłam score i total
             if(areAllPlayersConnected() && current_trick == 14 && player_receiving_deal == 4){
 
-                // przygotuj score i total
-                std::string score_message = prepareScoreMessage();
-                std::string total_message = prepareTotalMessage();
-                std::string message = score_message + total_message;
-
-                // próbuje wysłać score i total do gracza
-                if(buffer_counter[player_receiving_score_and_total + 6] == 0){
-                    buffer_counter[player_receiving_score_and_total + 6] = message.length();
-                    strcpy(buffer[player_receiving_score_and_total + 6], message.c_str());
-                }
-
-                // próbuje wysłać score i total do gracza
-                if(poll_descriptors[player_receiving_score_and_total + 6].revents & POLLOUT){ // jeśli jest możliwość zapisu
-                    ssize_t bytes_sent = send(poll_descriptors[player_receiving_score_and_total + 6].fd, buffer[player_receiving_score_and_total + 6], buffer_counter[player_receiving_score_and_total + 6], 0);
-                    if(bytes_sent < 0){
-                        std::cerr << "Błąd podczas wysyłania score i total\n";
-                        close(poll_descriptors[player_receiving_score_and_total + 6].fd);
-                        return 1;
-                    }
-                    // ziomeczek się rozłączył
-                    if(bytes_sent == 0){
-                        close(poll_descriptors[player_receiving_score_and_total + 6].fd);
-                        poll_descriptors[player_receiving_score_and_total + 6].fd = -1;
-                        poll_descriptors[player_receiving_score_and_total + 1].fd = -1;
-                        buffer_counter[player_receiving_score_and_total + 6] = 0;
-                        memset(buffer[player_receiving_score_and_total + 6], 0, BUFFER_SIZE);
-                        disconnectPlayer(player_receiving_score_and_total);
-                    }
-                    // przesuwam bajty na początek bufora
-                    buffer_counter[player_receiving_score_and_total + 6] -= bytes_sent;
-                    memmove(buffer[player_receiving_score_and_total + 6], buffer[player_receiving_score_and_total + 6] + bytes_sent, buffer_counter[player_receiving_score_and_total + 6]);
-                }
-
-                // udało się wysłać score i total do gracza
-                if(buffer_counter[player_receiving_score_and_total + 6] == 0 && poll_descriptors[player_receiving_score_and_total + 6].fd != -1){
-                    player_receiving_score_and_total += 1;
-                }
-
-                // jeśli wysłałem wszystkie score i total
-                if(player_receiving_score_and_total == 4){
-                    player_receiving_score_and_total = 0;
-                    player_receiving_deal = -1;
-                    zeroPointsInDeal();
-                    zeroTakenHistory();
-                    reset_deals_sent();
-                    current_deal_number += 1;
-                    current_trick = 1;
-                    // zaznacz, że jest to czas na rozdanie
-                    if(current_deal_number == number_of_deals_to_play){
-                        finish = true;
-                        disconnectAllPlayers(poll_descriptors);
-                    }else{
-                        current_deal = gameplay.getDeal(current_deal_number);
-                    }
-                }
+                manageSendingScoreAndTotal(poll_descriptors, buffer, buffer_counter);
             }
 
         // jeśli mam coś do wysłania w waiting roomie
@@ -835,14 +678,16 @@ int Server::run(){
                 ssize_t bytes_sent = send(poll_descriptors[PWRITE].fd, buffer[PWRITE], buffer_counter[PWRITE], 0);
                 // jeśli wystąpił błąd
                 if(bytes_sent < 0){
-                    if (errno == EPIPE || errno == ECONNRESET) {
-                        // Klient się rozłączył lub połączenie zostało zresetowane
-                        perror("send failed, disconnecting client");
-                        close(poll_descriptors[PREAD].fd);
-                        realiseWaitingRoom(poll_descriptors, buffer, buffer_counter);
-                    } else if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                        perror("send would block, try again later");
-                    }
+                    if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                            perror("send would block, try again later");
+                        }else if(errno == EPIPE || errno == ECONNRESET){
+                            last_event_IAM = -1;
+                            realiseWaitingRoom(poll_descriptors, buffer, buffer_counter);
+                        }else{
+                            disconnectAllPlayers(poll_descriptors);
+                            close(poll_descriptors[CONNECTION_SOCKET].fd);
+                            syserr("write");
+                        }
                 }else{
                     // jeśli udało się wysłać niezerowe bajty
                     buffer_counter[PWRITE] -= bytes_sent;
@@ -883,6 +728,199 @@ int Server::run(){
     close(poll_descriptors[CONNECTION_SOCKET].fd);
     std::cout << "Zamknięto gniazdo\n";
     return 0;
+}
+
+void Server::manageSendingScoreAndTotal(struct pollfd poll_descriptors[11], char buffer[11][BUFFER_SIZE], size_t buffer_counter[11]){
+    // przygotuj score i total
+                std::string score_message = prepareScoreMessage();
+                std::string total_message = prepareTotalMessage();
+                std::string message = score_message + total_message;
+
+
+                // próbuje wysłać score i total do gracza
+                if(buffer_counter[player_receiving_score_and_total + 6] == 0){
+                    buffer_counter[player_receiving_score_and_total + 6] = message.length();
+                    strcpy(buffer[player_receiving_score_and_total + 6], message.c_str());
+                }
+
+                // próbuje wysłać score i total do gracza
+                if(poll_descriptors[player_receiving_score_and_total + 6].revents & POLLOUT){ // jeśli jest możliwość zapisu
+                    ssize_t bytes_sent = send(poll_descriptors[player_receiving_score_and_total + 6].fd, buffer[player_receiving_score_and_total + 6], buffer_counter[player_receiving_score_and_total + 6], 0);
+                    if(bytes_sent < 0){
+                        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                            perror("send would block, try again later");
+                        }else if(errno == EPIPE || errno == ECONNRESET){
+                            close(poll_descriptors[player_receiving_score_and_total + 6].fd);
+                            poll_descriptors[player_receiving_score_and_total + 6].fd = -1;
+                            poll_descriptors[player_receiving_score_and_total + 1].fd = -1;
+                            buffer_counter[player_receiving_score_and_total + 6] = 0;
+                            memset(buffer[player_receiving_score_and_total + 6], 0, BUFFER_SIZE);
+                            disconnectPlayer(player_receiving_score_and_total);
+                        }else{
+                            disconnectAllPlayers(poll_descriptors);
+                            close(poll_descriptors[CONNECTION_SOCKET].fd);
+                            syserr("write");
+                        }
+                    }else{
+
+                        // przesuwam bajty na początek bufora
+                        buffer_counter[player_receiving_score_and_total + 6] -= bytes_sent;
+                        memmove(buffer[player_receiving_score_and_total + 6], buffer[player_receiving_score_and_total + 6] + bytes_sent, buffer_counter[player_receiving_score_and_total + 6]);
+                        if(buffer_counter[player_receiving_score_and_total + 6] <= total_message.length() && score_sent == false){
+                            raport(get_local_address(poll_descriptors[player_receiving_score_and_total+6].fd), get_server_address(poll_descriptors[player_receiving_score_and_total+6].fd), score_message);
+                            score_sent = true;
+                        }
+                        if(buffer_counter[player_receiving_score_and_total + 6] == 0){
+                            // std::cout << "Rapotyuje total\n";
+                            raport(get_local_address(poll_descriptors[player_receiving_score_and_total+6].fd), get_server_address(poll_descriptors[player_receiving_score_and_total+6].fd), total_message);
+                            score_sent = false;
+                        }
+                        // sleep(1);
+                    }
+                    
+                }
+
+                // udało się wysłać score i total do gracza
+                if(buffer_counter[player_receiving_score_and_total + 6] == 0 && poll_descriptors[player_receiving_score_and_total + 6].fd != -1){
+                    player_receiving_score_and_total += 1;
+                }
+
+                // jeśli wysłałem wszystkie score i total
+                if(player_receiving_score_and_total == 4){
+                    player_receiving_score_and_total = 0;
+                    player_receiving_deal = -1;
+                    zeroPointsInDeal();
+                    zeroTakenHistory();
+                    reset_deals_sent();
+                    current_deal_number += 1;
+                    current_trick = 1;
+                    // zaznacz, że jest to czas na rozdanie
+                    if(current_deal_number == number_of_deals_to_play){
+                        finish = true;
+                        disconnectAllPlayers(poll_descriptors);
+                    }else{
+                        current_deal = gameplay.getDeal(current_deal_number);
+                    }
+                }
+}
+
+void Server::manageSendingTaken(struct pollfd poll_descriptors[11], char buffer[11][BUFFER_SIZE], size_t buffer_counter[11]){
+
+    // próbuje wysłać taken do wszystkich zaczynając od pierwszego gracza
+                std::cout << "trick message to send: " << "TRICK" + std::to_string(current_trick) + lined_cards + "\r\n";
+                int who_takes_current_trick = whoTakeTrick(first_player_in_current_trick, "TRICK" + std::to_string(current_trick) + lined_cards + "\r\n");
+                std::cout << "who takes current trick: " << who_takes_current_trick << "\n";
+                    std::cout << "Kto bierze trick: " << getCharOfPlayer(who_takes_current_trick) << "\n";
+                    std::string message = "TAKEN" + std::to_string(current_trick) + lined_cards + getCharOfPlayer(who_takes_current_trick) + "\r\n";
+
+                // jeśli w bufferze skierowanego do tego gracza nic nie ma
+                if(buffer_counter[player_receiving_taken + 6] == 0){
+                    buffer_counter[player_receiving_taken + 6] = message.length();
+                    strcpy(buffer[player_receiving_taken + 6], message.c_str());
+                }
+
+                // próbuje wystawić taken do gracza
+                if(poll_descriptors[player_receiving_taken + 6].revents & POLLOUT){ // jeśli jest możliwość zapisu
+                    ssize_t bytes_sent = send(poll_descriptors[player_receiving_taken + 6].fd, buffer[player_receiving_taken + 6], buffer_counter[player_receiving_taken + 6], 0);
+                    if(bytes_sent < 0){
+                        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                            perror("send would block, try again later");
+                        }else if(errno == EPIPE || errno == ECONNRESET){
+                            close(poll_descriptors[player_receiving_taken + 6].fd);
+                            poll_descriptors[player_receiving_taken + 6].fd = -1;
+                            poll_descriptors[player_receiving_taken + 1].fd = -1;
+                            buffer_counter[player_receiving_taken + 6] = 0;
+                            memset(buffer[player_receiving_taken + 6], 0, BUFFER_SIZE);
+                            disconnectPlayer(player_receiving_taken);
+                        }else{
+                            disconnectAllPlayers(poll_descriptors);
+                            close(poll_descriptors[CONNECTION_SOCKET].fd);
+                            syserr("write");
+                        }
+                    }else{
+                        // przesuwam bajty na początek bufora
+                        buffer_counter[player_receiving_taken + 6] -= bytes_sent;
+                        memmove(buffer[player_receiving_taken + 6], buffer[player_receiving_taken + 6] + bytes_sent, buffer_counter[player_receiving_taken + 6]);
+                        if(buffer_counter[player_receiving_taken + 6] == 0){
+                            raport(get_local_address(poll_descriptors[player_receiving_taken+6].fd), get_server_address(poll_descriptors[player_receiving_taken+6].fd), message);
+                        }
+                    }
+                }
+
+                // udało się wysłać taken do gracza
+                if(buffer_counter[player_receiving_taken + 6] == 0 && poll_descriptors[player_receiving_taken + 6].fd != -1){
+                    player_receiving_taken += 1;
+                }
+                
+                // po wysłaniu taken do wszystkich
+                if(player_receiving_taken == 4){
+                    int how_many_point_in_trick = pointsInTrick(lined_cards, current_deal.getType() - '0');
+                    addPointsToPlayer(who_takes_current_trick, how_many_point_in_trick);
+                    addTakenToHistory(message);
+                    current_trick += 1;
+                    first_player_in_current_trick = who_takes_current_trick;
+                    current_player_receiving_trick = first_player_in_current_trick;
+                    lined_cards = "";
+                    how_many_added_card = 0;
+                    player_receiving_taken = 0;
+                }
+
+}
+
+void Server::manageDealCards(struct pollfd poll_descriptors[11], char buffer[11][BUFFER_SIZE], size_t buffer_counter[11]){
+    // jeśli w bufferze skierowanego do tego gracza nic nie ma
+                if(buffer_counter[player_receiving_deal + 6] == 0){
+
+                    std::string message = getProperDeal(getCharOfPlayer(player_receiving_deal));
+                    buffer_counter[player_receiving_deal + 6] = message.length();
+                    strcpy(buffer[player_receiving_deal + 6], message.c_str());
+
+                }
+
+                // próbuje wysłać deala do tego gracza
+                if(poll_descriptors[player_receiving_deal + 6].revents & POLLOUT){ // jest możliwość zapisu
+                    ssize_t bytes_sent = send(poll_descriptors[player_receiving_deal + 6].fd, buffer[player_receiving_deal + 6], buffer_counter[player_receiving_deal + 6], 0);
+                    // wystąpił błąd 
+                    if(bytes_sent < 0){
+
+                        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                            perror("send would block, try again later");
+                        }else if(errno == EPIPE || errno == ECONNRESET){
+                            
+                            close(poll_descriptors[player_receiving_deal + 6].fd);
+                            poll_descriptors[player_receiving_deal + 6].fd = -1;
+                            poll_descriptors[player_receiving_deal + 1].fd = -1;
+                            buffer_counter[player_receiving_deal + 6] = 0;
+                            memset(buffer[player_receiving_deal + 6], 0, BUFFER_SIZE);
+                            disconnectPlayer(player_receiving_deal);
+
+                        }else{
+                            disconnectAllPlayers(poll_descriptors);
+                            close(poll_descriptors[CONNECTION_SOCKET].fd);
+                            syserr("write");
+                        }
+                    
+                    // udało się wysłać niezerowe bajty
+                        }else{
+
+                            buffer_counter[player_receiving_deal + 6] -= bytes_sent;
+                            memmove(buffer[player_receiving_deal + 6], buffer[player_receiving_deal + 6] + bytes_sent, buffer_counter[player_receiving_deal + 6]);
+                        }
+                    // przesuwam bajty na początek bufora
+                }
+
+                if(buffer_counter[player_receiving_deal + 6] == 0 && poll_descriptors[player_receiving_deal + 6].fd != -1){
+                    // muszę dodać karty
+                    deals_sent[player_receiving_deal] = true;
+                    raport(get_local_address(poll_descriptors[player_receiving_deal+6].fd), get_server_address(poll_descriptors[player_receiving_deal+6].fd), getProperDeal(getCharOfPlayer(player_receiving_deal)));   
+                    cards_of_players[player_receiving_deal].addCardsFromCardsString(getDealCardsForPlayer(getCharOfPlayer(player_receiving_deal)));
+                    player_receiving_deal += 1;
+                }
+                
+                if(player_receiving_deal == 4){
+                    first_player_in_current_trick = getPlayerfromChar(current_deal.getFirstPlayer());
+                    current_player_receiving_trick = getPlayerfromChar(current_deal.getFirstPlayer());
+                }
 }
 
 bool Server::checkIfPlayerCanPlayCard(const std::string& card){

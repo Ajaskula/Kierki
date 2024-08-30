@@ -72,6 +72,9 @@ class Server{
         bool checkIfPlayerCanPlayCard(const std::string& card);
         bool checkIfPlayerHasCard(const std::string& card);
         void disconnectAllPlayers(struct pollfd fds[11]);
+        void manageDealCards(struct pollfd poll_descriptors[11], char buffer[11][BUFFER_SIZE], size_t buffer_counter[11]);
+        void manageSendingTaken(struct pollfd poll_descriptors[11], char buffer[11][BUFFER_SIZE], size_t buffer_counter[11]);
+        void manageSendingScoreAndTotal(struct pollfd poll_descriptors[11], char buffer[11][BUFFER_SIZE], size_t buffer_counter[11]);
 
 
     private:
@@ -128,6 +131,7 @@ class Server{
         char assignFromWaitingRoom;
         bool disconnectFromWaitingRoom;
         std::string message_to_raport_from_waiting_room;
+        bool score_sent;
 
 };
 #endif // SERVER_H
