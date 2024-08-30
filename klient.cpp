@@ -404,7 +404,7 @@ int Klient::run(){
     fds[2].fd = socket_fd; fds[2].events = POLLOUT;
     char sending_buffer[1024]; memset(sending_buffer, 0, 1024);
     char buffer[1024]; memset(buffer, 0, 1024);
-
+    // sleep(10);
     send_message(sending_buffer, message);
 
     while(true){

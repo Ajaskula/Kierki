@@ -4,7 +4,6 @@
 #include <cinttypes>
 #include <thread>
 
-// chyba dobrze
 int Server::parseArguments(int argc, char* argv[], uint16_t& port, std::string& file, int& timeout){
     for(int i = 1; i < argc; i++){
         std::string arg = argv[i];
@@ -41,7 +40,8 @@ Server::Server(uint16_t port, const std::string& file, int timeout)
         last_event_IAM(-1), last_event_TRICK(-1), lined_cards(""), finish(false), time_point_IAM(), time_point_TRICK(), current_deal_number(0),
         takenHistory(), how_many_added_card(0), first_player_in_current_trick(-1), current_deal(),
         number_of_deals_to_play(gameplay.getNumberOfDeals()), player_receiving_deal(-1), cards_of_players(4, CardSet()), current_player_receiving_trick(-1),
-        player_receiving_taken(0), player_receiving_score_and_total(0), local_address()
+        player_receiving_taken(0), player_receiving_score_and_total(0), local_address(), messagesToSendFromWaitingRoom(),
+        assignFromWaitingRoom('B'), disconnectFromWaitingRoom(false), message_to_raport_from_waiting_room("")
         {}
 
 Server::~Server(){}
@@ -310,26 +310,26 @@ std::string Server::busyPlacesToString(){
     }
     return busy_places;
 }
-void Server::assignClientToPlace(const std::string& message, struct pollfd poll_descriptors[11]){
-    if(message[3] == 'N'){
+void Server::assignClientToPlace(char place, struct pollfd poll_descriptors[11]){
+    if(place == 'N'){
         is_N_connected = true;
         poll_descriptors[NREAD].fd = poll_descriptors[PREAD].fd;
         poll_descriptors[NWRITE].fd = poll_descriptors[PWRITE].fd;
         std::cout << "Gracz N podłączony\n";
     }
-    if(message[3] == 'S'){
+    if(place == 'S'){
         is_S_connected = true;
         poll_descriptors[SREAD].fd = poll_descriptors[PREAD].fd;
         poll_descriptors[SWRITE].fd = poll_descriptors[PWRITE].fd;
         std::cout << "Gracz S podłączony\n";
     }
-    if(message[3] == 'W'){
+    if(place == 'W'){
         is_W_connected = true;
         poll_descriptors[WREAD].fd = poll_descriptors[PREAD].fd;
         poll_descriptors[WWRITE].fd = poll_descriptors[PWRITE].fd;
         std::cout << "Gracz W podłączony\n";
     }
-    if(message[3] == 'E'){
+    if(place == 'E'){
         is_E_connected = true;
         poll_descriptors[EREAD].fd = poll_descriptors[PREAD].fd;
         poll_descriptors[EWRITE].fd = poll_descriptors[PWRITE].fd;
@@ -386,30 +386,35 @@ void Server::realiseWaitingRoom(struct pollfd poll_descriptors[11], char buffer[
     memset(buffer[PWRITE], 0, BUFFER_SIZE);
     buffer_counter[PREAD] = 0;
     buffer_counter[PWRITE] = 0;
-    last_event_IAM = -1;
 }
-void Server::responseToIAM(const std::string& message, struct pollfd poll_descriptors[11]){
+void Server::responseToIAM(const std::string& message, struct pollfd poll_descriptors[11], char buffer[11][BUFFER_SIZE], size_t buffer_counter[11]){
     int IAM_type = validateIAM(message);
     switch(IAM_type){
         case 0:// wolne miejsce
 
             // jeśli reconnectuje to dostanie swojego deala
             if(deals_sent[getPlayerfromChar(message[3])] == true){
-                send_message(poll_descriptors[PWRITE].fd, getProperDeal(message[3]));
+                messagesToSendFromWaitingRoom.push_back(getProperDeal(message[3]));
             }
             // dostanie również historie lew
-            for(std::string& message : takenHistory){
-                send_message(poll_descriptors[PWRITE].fd, message);
+            for(std::string& taken : takenHistory){
+                messagesToSendFromWaitingRoom.push_back(taken);
             }
-            // dopiero takiego zawodnika, który zna stan gry, przypisuje do miejsca
-            assignClientToPlace(message, poll_descriptors);
+            if(messagesToSendFromWaitingRoom.size() == 0){
+                assignClientToPlace(message[3], poll_descriptors);
+                realiseWaitingRoom(poll_descriptors, buffer, buffer_counter);
+            }else{
+                assignFromWaitingRoom = message[3];
+            }
             break;
         case 1:// zajęte miejsce
-            send_message(poll_descriptors[PWRITE].fd, "BUSY" + busyPlacesToString() + "\r\n");
-            close(poll_descriptors[PREAD].fd);
+            messagesToSendFromWaitingRoom.push_back("BUSY" + busyPlacesToString() + "\r\n");
+            assignFromWaitingRoom = 'B';
+            
             break;
         default:// nieprawidłowe IAM
             close(poll_descriptors[PREAD].fd);
+            realiseWaitingRoom(poll_descriptors, buffer, buffer_counter);
     }
 }
 
@@ -459,7 +464,6 @@ int Server::run(){
         return 1;
     }
     if(gameplay.getNumberOfDeals() == 0){
-        // std::cerr << "Brak rozdań do gry\n";
         return 0;
     }
     // std::string local_address = get_local_address(socket_fd);
@@ -806,6 +810,69 @@ int Server::run(){
                     }
                 }
             }
+
+        // jeśli mam coś do wysłania w waiting roomie
+        if( (messagesToSendFromWaitingRoom.size() > 0 || buffer_counter[PWRITE] > 0)){
+            std::cout << "coś do wysłania w waiting roomie\n";
+            // jeśli bufor wysyłania jest pusty
+            // umieszczam następną wiadomość do wysłania w buforze
+            if(buffer_counter[PWRITE] == 0){
+                if(messagesToSendFromWaitingRoom.size() > 0){
+                    std::string message = messagesToSendFromWaitingRoom.front();
+                    if (!messagesToSendFromWaitingRoom.empty()) {
+                        messagesToSendFromWaitingRoom.erase(messagesToSendFromWaitingRoom.begin());
+                    }
+                    buffer_counter[PWRITE] = message.length();
+                    strcpy(buffer[PWRITE], message.c_str());
+                    message_to_raport_from_waiting_room = message;
+                }
+            }
+            
+            // jeśli jest możliwość zapisu
+            if(poll_descriptors[PWRITE].revents & POLLOUT){
+                
+                // próbuje wysłać wiadomość
+                ssize_t bytes_sent = send(poll_descriptors[PWRITE].fd, buffer[PWRITE], buffer_counter[PWRITE], 0);
+                // jeśli wystąpił błąd
+                if(bytes_sent < 0){
+                    if (errno == EPIPE || errno == ECONNRESET) {
+                        // Klient się rozłączył lub połączenie zostało zresetowane
+                        perror("send failed, disconnecting client");
+                        close(poll_descriptors[PREAD].fd);
+                        realiseWaitingRoom(poll_descriptors, buffer, buffer_counter);
+                    } else if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                        perror("send would block, try again later");
+                    }
+                }else{
+                    // jeśli udało się wysłać niezerowe bajty
+                    buffer_counter[PWRITE] -= bytes_sent;
+                    memmove(buffer[PWRITE], buffer[PWRITE] + bytes_sent, buffer_counter[PWRITE]);
+                }
+                
+                // jeśli udało się wysłać wiadomość
+                if(buffer_counter[PWRITE] == 0){
+                    // raportuje wysłanie wiadomości
+                    raport(get_local_address(poll_descriptors[PWRITE].fd), get_server_address(poll_descriptors[PWRITE].fd), message_to_raport_from_waiting_room);
+                    // podejmuje odpowiednie kroki
+                    // jeśli wysłałem już wszystkie wiadomości
+                    if(messagesToSendFromWaitingRoom.size() == 0){
+
+                        // wysłałem busy
+                        if(assignFromWaitingRoom == 'B'){
+
+                            close(poll_descriptors[PREAD].fd);
+                            realiseWaitingRoom(poll_descriptors, buffer, buffer_counter);
+                        // przypisałem do jakiegoś miejsca
+                        }else{
+                            assignClientToPlace(assignFromWaitingRoom, poll_descriptors);
+                            realiseWaitingRoom(poll_descriptors, buffer, buffer_counter);
+                        }
+                    }
+
+                }
+            }
+
+        }
                 
         }// poll status > 0
 
@@ -986,39 +1053,46 @@ int Server::manWaitingRoom(struct pollfd poll_descriptors[11], char buffer[11][B
             std::cerr << "Błąd podczas odczytywania wiadomości\n";
             close(poll_descriptors[CONNECTION_SOCKET].fd);
             disconnectAllPlayers(poll_descriptors);
+            last_event_IAM = -1;
             realiseWaitingRoom(poll_descriptors, buffer, buffer_counter);
             return 1;
         }else if(bytes_received == 0){ // client się rozłączył
 
             close(poll_descriptors[PREAD].fd);
+            last_event_IAM = -1;
             realiseWaitingRoom(poll_descriptors, buffer, buffer_counter);
                     
         }else{ // otrzymałem bajt
             char received_char = buffer[PREAD][buffer_counter[PREAD]];
             buffer_counter[PREAD] += 1;
+            last_event_IAM = -1;
+            // std::cout << "Otrzymano bajt: " << received_char << "\n";
             
             if(received_char == '\n'){
                 if(buffer_counter[PREAD] > 1 && buffer[PREAD][buffer_counter[PREAD] - 2] == '\r'){
                     std::string message(buffer[PREAD], buffer_counter[PREAD]);
-                    responseToIAM(message, poll_descriptors);
-                    realiseWaitingRoom(poll_descriptors, buffer, buffer_counter);
+                    raport(get_server_address(poll_descriptors[PREAD].fd), getClientInfo(poll_descriptors[PREAD].fd), message);
+                    responseToIAM(message, poll_descriptors, buffer, buffer_counter);
+                    std::cout << "Odpowiedź na IAM\n";
                 }
             }
 
             if(buffer_counter[PREAD] == MESSAGE_LIMIT){
                 buffer[PREAD][buffer_counter[PREAD]] = '\r';
                 buffer[PREAD][buffer_counter[PREAD] + 1] = '\n';
-                //FIXME:: add raport here
+                std::string message(buffer[PREAD], buffer_counter[PREAD]);
+                raport(get_server_address(poll_descriptors[PREAD].fd), getClientInfo(poll_descriptors[PREAD].fd), message);
                 close(poll_descriptors[PREAD].fd);
                 realiseWaitingRoom(poll_descriptors, buffer, buffer_counter);
             }
         }
                 
     }else{ // sprawdzam, czy nie został przekroczony limit czasu na przesłanie IAM
-        if(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - time_point_IAM).count() > timeout){
+        if(last_event_IAM == 0 && std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - time_point_IAM).count() > timeout){
             // rozłączam się z takim klientem
             close(poll_descriptors[PREAD].fd);
             // czyszę poczekalnię
+            last_event_IAM = -1;
             realiseWaitingRoom(poll_descriptors, buffer, buffer_counter);
             std::cout << "Timeout na IAM\n";
         }

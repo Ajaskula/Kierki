@@ -41,11 +41,11 @@ class Server{
         int validateIAM(const std::string& message);
         void realiseWaitingRoom(struct pollfd fds[11], char buffer[11][BUFFER_SIZE], size_t buffer_counter[11]);
         std::string busyPlacesToString();
-        void assignClientToPlace(const std::string& message, struct pollfd* fds);
+        void assignClientToPlace(char message, struct pollfd* fds);
         void initialize_poll_descriptors(int socket_fd, struct pollfd* fds);
         void initializeBuffers(char buffer[11][1024], size_t buffer_counter[11]);
         void reset_revents(struct pollfd fds[11]);
-        void responseToIAM(const std::string& message, struct pollfd fds[11]);
+        void responseToIAM(const std::string& message, struct pollfd fds[11], char buffer[11][BUFFER_SIZE], size_t buffer_counter[11]);
         void send_message(int fd, const std::string& message);
         void wypisz_zdarzenia(struct pollfd fds[11]);
         bool areAllPlayersConnected();
@@ -124,6 +124,10 @@ class Server{
         int player_receiving_taken;
         int player_receiving_score_and_total;
         std::string local_address;
+        std::vector<std::string> messagesToSendFromWaitingRoom;
+        char assignFromWaitingRoom;
+        bool disconnectFromWaitingRoom;
+        std::string message_to_raport_from_waiting_room;
 
 };
 #endif // SERVER_H
