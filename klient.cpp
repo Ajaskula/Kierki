@@ -488,6 +488,7 @@ int Klient::run(){
                                 got_TRICK = false;
                             }
                         }else if(validateWRONG(message)){
+                            // wrong message received
                                 if(!isBot){
                                     std::cout << "Wrong message received in trick " << current_trick << ".\n";
                                 }
@@ -539,7 +540,7 @@ int Klient::run(){
                 printTakenTricks();
             }
             if(is_valid_request_to_send_card(message)){
-                std::string to_send = "TRICK" + std::to_string(current_trick) + message.substr(1) + "\r\n";
+                std::string to_send = "TRICK" + std::to_string(current_trick) + message.substr(1) + "\r\n"; 
                 send_message(sending_buffer, to_send);
             }
 

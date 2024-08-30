@@ -46,7 +46,6 @@ Server::Server(uint16_t port, const std::string& file, int timeout)
 
 Server::~Server(){}
 
-// dobrze
 void Server::send_message(int socket_fd, const std::string &message){
     size_t length = message.length();
     ssize_t bytes_sent = send(socket_fd, message.c_str(), length, 0);
@@ -58,7 +57,6 @@ void Server::send_message(int socket_fd, const std::string &message){
     }
     raport(get_local_address(socket_fd), get_server_address(socket_fd), message);
 }
-// dobrze
 int Server::validateIAM(const std::string& message){
     if(message.length() != 6){
         return -1;
@@ -66,7 +64,6 @@ int Server::validateIAM(const std::string& message){
     if(message[3] != 'N' && message[3] != 'S' && message[3] != 'W' && message[3] != 'E'){
         return -1;
     }
-    // sprawdzam czy ten zawodnik jest akurat podłączony
     if(is_E_connected && (message[3] == 'E')){
         return 1;
     }
@@ -79,7 +76,7 @@ int Server::validateIAM(const std::string& message){
     if(is_W_connected && (message[3] == 'W')){
         return 1;
     }
-    // prawidłowe IAM na wolne miejsce
+
     return 0;
 }
 
@@ -91,7 +88,6 @@ int Server::setupServerSocket(){
         return -1;
     }
 
-    // Ustawienie gniazda, aby obsługiwało zarówno IPv6 jak i IPv4
     int flag = 0;
     if (setsockopt(socket_fd, IPPROTO_IPV6, IPV6_V6ONLY, (void *)&flag, sizeof(flag)) < 0) {
         std::cerr << "Błąd podczas ustawiania opcji gniazda\n";
@@ -104,20 +100,17 @@ int Server::setupServerSocket(){
     server_address.sin6_addr = in6addr_any;
     server_address.sin6_port = htons(port);
 
-    // próbuje bindować gniazdo do konkretnego adresu
     if(bind(socket_fd, (struct sockaddr*)&server_address, (socklen_t) sizeof(server_address)) < 0){
         std::cerr << "Błąd podczas bindowania gniazda\n";
         close(socket_fd);
         return -1;
     }
 
-    // przełączam gniazdo w tryb nasłuchiwania
     if(listen(socket_fd, queue_length) < 0){
         std::cerr << "Błąd podczas nasłuchiwania na gnieździe\n";
         close(socket_fd);
         return -1;
     }
-    // Ustawienie gniazda w tryb nieblokujący
     int flags = fcntl(socket_fd, F_GETFL, 0);
     if (flags < 0) {
         std::cerr << "Błąd podczas pobierania flag gniazda\n";
@@ -130,20 +123,17 @@ int Server::setupServerSocket(){
         return -1;
     }
 
-    // sprawdzam jaki port został wybrany
     socklen_t length = (socklen_t) sizeof server_address;
     if (getsockname(socket_fd, (struct sockaddr*) &server_address, &length) < 0){
         std::cerr << "Błąd podczas pobierania numeru portu\n";
         close(socket_fd);
         return -1;
     }
-    std::cout << "Serwer nasłuchuje na porcie: " << ntohs(server_address.sin6_port) << "\n";
 
     return socket_fd;
 }
 bool Server::validateTRICK(const std::string& trick){
     std::string message = trick;
-    std::cout << "Sprawdzam trick\n";
     if(message.length() < 10 || message.length() > 12){
         return false;
     }
@@ -152,14 +142,11 @@ bool Server::validateTRICK(const std::string& trick){
 
     }
     message = message.substr(5, message.length() - 7);
-    std::cout << "Trick: " << message << "d\n";
-    // int trick_number = 0;
 
     if(message[message.length() - 1] != 'C' && message[message.length() - 1] != 'D' && message[message.length() - 1] != 'H' && message[message.length() - 1] != 'S'){
         return false;
     }
     message = message.substr(0, message.length() - 1);
-    std::cout << "Trick: " << message << "\n";
     if(message[message.length() - 1] == '0'){
         if(message[message.length() - 2] != '1'){
             return false;
@@ -186,7 +173,6 @@ bool Server::validateTRICK(const std::string& trick){
     if(trick_number < 1 || trick_number > 13){
         return false;
     }
-    std::cout << "zwracam true\n";
     return true;
 }
 int Server::pointsInTrick(const std::string& trick, int type){
@@ -214,13 +200,33 @@ int Server::pointsInTrick(const std::string& trick, int type){
     }
     return 0;
 }
+int Server::calculateTrickNumFromTRICK(const std::string& trick){
+    std::string message = trick;
+    message = message.substr(5, message.length() - 7);
+
+    message = message.substr(0, message.length() - 1);
+    if(message[message.length() - 1] == '0'){
+ 
+        message = message.substr(0, message.length() - 2);
+
+    }else if(((message[message.length() - 1] <= '9' && message[message.length() - 1] >= '2') || message[message.length() - 1] == 'J' || message[message.length() - 1] == 'Q' || message[message.length() - 1] == 'K' || message[message.length() - 1] == 'A')){
+        message = message.substr(0, message.length() - 1);
+    }
+
+    int trick_number = 0;
+    if(message.length() == 1){
+        trick_number = message[0] - '0';
+    }
+    if(message.length() == 2){
+        trick_number = 10 * (message[0] - '0');
+        trick_number += message[1] - '0';
+    }
+    return trick_number;
+}
 
 int Server::whoTakeTrick(int first_player, const std::string& trick){
     
-    std::cout << "Kto bierze trick\n";
-    std::cout << "Trick: " << trick << "\n";
     char first_card_color = get_first_card_color_from_TRICK(trick);
-    std::cout << "Kolor pierwszej karty: " << first_card_color << "\n";
     std::vector<std::string> cards = Card::extractCardsVectorFromCardsStringStr(trick.substr(6 + (current_trick >= 10), trick.length() - 8 - (current_trick >= 10)));
     int max_card_number = 0;
     for(int i = 1; i < 4; i++){
@@ -274,26 +280,23 @@ int Server::checkIfKingOfHeartsInTrick(const std::string& trick){
 }
 int Server::calculateTimeToWait() {
     if (last_event_IAM == -1 && last_event_TRICK == -1) {
-        return -1;  // Jeśli żadne zdarzenie nie miało miejsca, zwróć -1
+        return -1;  
     }
 
     int timeout_ms = timeout;
     if (last_event_IAM != -1) {
-        // Oblicz czas pozostały do timeoutu na otrzymanie IAM
         auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - time_point_IAM);
         int time_to_iam_timeout = timeout - elapsed_time.count();
         timeout_ms = std::min(timeout_ms, time_to_iam_timeout);
     }
 
     if (last_event_TRICK != -1) {
-        // Oblicz czas pozostały do timeoutu na otrzymanie TRICK
         int time_to_trick_timeout = timeout - std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - time_point_TRICK).count();
         timeout_ms = std::min(timeout_ms, time_to_trick_timeout);
     }
 
-    return std::max(0, timeout_ms);  // Upewnij się, że timeout nie jest ujemny
+    return std::max(0, timeout_ms); 
 }
-// dobra funkcja
 std::string Server::busyPlacesToString(){
     std::string busy_places = "";
     if(is_N_connected){
@@ -315,39 +318,32 @@ void Server::assignClientToPlace(char place, struct pollfd poll_descriptors[11])
         is_N_connected = true;
         poll_descriptors[NREAD].fd = poll_descriptors[PREAD].fd;
         poll_descriptors[NWRITE].fd = poll_descriptors[PWRITE].fd;
-        std::cout << "Gracz N podłączony\n";
     }
     if(place == 'S'){
         is_S_connected = true;
         poll_descriptors[SREAD].fd = poll_descriptors[PREAD].fd;
         poll_descriptors[SWRITE].fd = poll_descriptors[PWRITE].fd;
-        std::cout << "Gracz S podłączony\n";
     }
     if(place == 'W'){
         is_W_connected = true;
         poll_descriptors[WREAD].fd = poll_descriptors[PREAD].fd;
         poll_descriptors[WWRITE].fd = poll_descriptors[PWRITE].fd;
-        std::cout << "Gracz W podłączony\n";
     }
     if(place == 'E'){
         is_E_connected = true;
         poll_descriptors[EREAD].fd = poll_descriptors[PREAD].fd;
         poll_descriptors[EWRITE].fd = poll_descriptors[PWRITE].fd;
-        std::cout << "Gracz E podłączony\n";
     }
 }
 void Server::initialize_poll_descriptors(int socket_fd, struct pollfd poll_descriptors[11]) {
-    // Zainicjalizuj gniazdo połączenia
     poll_descriptors[CONNECTION_SOCKET].fd = socket_fd;
     poll_descriptors[CONNECTION_SOCKET].events = POLLIN;
 
-    // Inicjalizacja deskryptorów dla przyjmowania wiadomości od klientów
     for (int i = 1; i <= 5; i++) {
         poll_descriptors[i].fd = -1;
         poll_descriptors[i].events = POLLIN;
     }
 
-    // Inicjalizacja deskryptorów dla zapisywania do klientów
     for (int i = 6; i <= 10; i++) {
         poll_descriptors[i].fd = -1;
         poll_descriptors[i].events = POLLOUT;
@@ -364,21 +360,6 @@ void Server::reset_revents(struct pollfd poll_descriptors[11]) {
         poll_descriptors[i].revents = 0;
     }
 }
-void Server::wypisz_zdarzenia(struct pollfd poll_descriptors[11]){
-    std::cout << "Zdarzenia: ";
-    std::cout << "CONNECTION_SOCKET: " << poll_descriptors[CONNECTION_SOCKET].revents << " ";
-    std::cout << "NREAD: " << poll_descriptors[NREAD].revents << " ";
-    std::cout << "EREAD: " << poll_descriptors[EREAD].revents << " ";
-    std::cout << "SREAD: " << poll_descriptors[SREAD].revents << " ";
-    std::cout << "WREAD: " << poll_descriptors[WREAD].revents << " ";
-    std::cout << "PREAD: " << poll_descriptors[PREAD].revents << " ";
-    std::cout << "NWRITE: " << poll_descriptors[NWRITE].revents << " ";
-    std::cout << "EWRITE: " << poll_descriptors[EWRITE].revents << " ";
-    std::cout << "SWRITE: " << poll_descriptors[SWRITE].revents << " ";
-    std::cout << "WWRITE: " << poll_descriptors[WWRITE].revents << " ";
-    std::cout << "PWRITE: " << poll_descriptors[PWRITE].revents << " ";
-    std::cout << "\n";
-}
 void Server::realiseWaitingRoom(struct pollfd poll_descriptors[11], char buffer[11][BUFFER_SIZE], size_t buffer_counter[11]) {
     poll_descriptors[PWRITE].fd = -1;
     poll_descriptors[PREAD].fd = -1;
@@ -390,13 +371,11 @@ void Server::realiseWaitingRoom(struct pollfd poll_descriptors[11], char buffer[
 void Server::responseToIAM(const std::string& message, struct pollfd poll_descriptors[11], char buffer[11][BUFFER_SIZE], size_t buffer_counter[11]){
     int IAM_type = validateIAM(message);
     switch(IAM_type){
-        case 0:// wolne miejsce
+        case 0:
 
-            // jeśli reconnectuje to dostanie swojego deala
             if(deals_sent[getPlayerfromChar(message[3])] == true){
                 messagesToSendFromWaitingRoom.push_back(getProperDeal(message[3]));
             }
-            // dostanie również historie lew
             for(std::string& taken : takenHistory){
                 messagesToSendFromWaitingRoom.push_back(taken);
             }
@@ -407,12 +386,12 @@ void Server::responseToIAM(const std::string& message, struct pollfd poll_descri
                 assignFromWaitingRoom = message[3];
             }
             break;
-        case 1:// zajęte miejsce
+        case 1:
             messagesToSendFromWaitingRoom.push_back("BUSY" + busyPlacesToString() + "\r\n");
             assignFromWaitingRoom = 'B';
             
             break;
-        default:// nieprawidłowe IAM
+        default:
             close(poll_descriptors[PREAD].fd);
             realiseWaitingRoom(poll_descriptors, buffer, buffer_counter);
     }
@@ -452,12 +431,12 @@ std::string get_local_address_server(int socket_fd) {
     return local_address;
 }
 
-// dobrze
 bool Server::areAllPlayersConnected(){
     return is_N_connected && is_S_connected && is_W_connected && is_E_connected;
 }
 
 int Server::run(){
+    signal(SIGPIPE, sigpipe_handler); 
     int socket_fd = setupServerSocket();
     if(socket_fd < 0){
         std::cerr << "Błąd podczas tworzenia gniazda\n";
@@ -466,8 +445,6 @@ int Server::run(){
     if(gameplay.getNumberOfDeals() == 0){
         return 0;
     }
-    // std::string local_address = get_local_address(socket_fd);
-    // std::cout << "Adres lokalny: " << local_address << "\n";
     char buffer[11][BUFFER_SIZE] = {0};
     size_t buffer_counter[11] = {0};
     struct pollfd poll_descriptors[11];
@@ -475,14 +452,11 @@ int Server::run(){
     initializeBuffers(buffer, buffer_counter);
     current_deal = gameplay.getDeal(current_deal_number);
     
-    // TODO implement not readeing at once
     do{
 
         reset_revents(poll_descriptors);
         int time_to_wait = calculateTimeToWait();
         int poll_status = poll(poll_descriptors, 11, time_to_wait);
-        // wypisz_zdarzenia(poll_descriptors);
-        // std::this_thread::sleep_for(std::chrono::milliseconds(50));
         if(poll_status < 0){
             if (errno == EINTR) {
                 std::cerr << "interrupted system call\n";
@@ -492,50 +466,37 @@ int Server::run(){
             }
         }else{
         
-            // nowe połączenie, obsługujemy jeśli nie ma nikogo w poczeklani
             if((poll_descriptors[CONNECTION_SOCKET].revents & POLLIN) && poll_descriptors[PREAD].fd == -1){
                 if(manConnectionSocket(socket_fd, poll_descriptors) == 1){
                     return 1;
                 }
             }
 
-            // ktoś jest w poczekalni, obsługujemy zawsze
-            if(poll_descriptors[PREAD].fd != -1){ // ktoś jest w poczekalni
+            if(poll_descriptors[PREAD].fd != -1){ 
 
                 if(manWaitingRoom(poll_descriptors, buffer, buffer_counter) == 1){
                     return 1;
                 }
             }
             
-            // jeśli wszyscy są podłączeni i nie było jeszcze dealowania
             if(areAllPlayersConnected() && player_receiving_deal == -1){
                 player_receiving_deal = 0;
             }
 
-            // dealuje karty
             if(areAllPlayersConnected() && player_receiving_deal < 4 && player_receiving_deal >= 0){
 
                 manageDealCards(poll_descriptors, buffer, buffer_counter);
             }
 
-            
-
-            // wysyłamy tricka do graczy
             if(areAllPlayersConnected() && how_many_added_card < 4 && current_trick <= 13 && player_receiving_deal == 4){
                 
-                // próba wysłania tricka
-                // do aktualnego gracza
-                // jeśli jego buffor wysyłkowy jest pusty
-                // to umieszam w nim poprawny trick
+                std::string message = "TRICK" + std::to_string(current_trick) + lined_cards + "\r\n";
                 if(buffer_counter[current_player_receiving_trick + 6] == 0 && (trick_sent[current_player_receiving_trick] == false)){
-                    std::string message = "TRICK" + std::to_string(current_trick) + lined_cards + "\r\n";
                     buffer_counter[current_player_receiving_trick + 6] = message.length();
                     strcpy(buffer[current_player_receiving_trick + 6], message.c_str());
                 }
 
-                // próbuje wysłać tricka do gracza
                 if(poll_descriptors[current_player_receiving_trick + 6].revents & POLLOUT && (trick_sent[current_player_receiving_trick] == false)){
-
                     ssize_t bytes_sent = send(poll_descriptors[current_player_receiving_trick + 6].fd, buffer[current_player_receiving_trick + 6], buffer_counter[current_player_receiving_trick + 6], 0);
                     if(bytes_sent < 0){
                         if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -557,21 +518,19 @@ int Server::run(){
                         memmove(buffer[current_player_receiving_trick + 6], buffer[current_player_receiving_trick + 6] + bytes_sent, buffer_counter[current_player_receiving_trick + 6]);
                     }
                     
-                    // przesuwam bajty na początek bufora
+
                     if(buffer_counter[current_player_receiving_trick + 6] == 0 && poll_descriptors[current_player_receiving_trick + 6].fd != -1){
                         time_point_TRICK = std::chrono::steady_clock::now();
                         last_event_TRICK = 0;
                         trick_sent[current_player_receiving_trick] = true;
+                        raport(get_local_address(poll_descriptors[current_player_receiving_trick + 6].fd), get_local_address(poll_descriptors[current_player_receiving_trick + 6].fd), message);
                     }
                 }
-                // jeśli wysłałem tricka, to czekam na odpowiedź od tego gracza
                 if(trick_sent[current_player_receiving_trick] == true){
                     
-                    if(poll_descriptors[current_player_receiving_trick + 1].revents & POLLIN){ // coś przyszło od tego gracza
-                            // odczytuje wiadomość od tego gracza bajt po bajcie
+                    if(poll_descriptors[current_player_receiving_trick + 1].revents & POLLIN){ 
                         ssize_t bytes_received = read(poll_descriptors[current_player_receiving_trick + 1].fd, buffer[current_player_receiving_trick + 1] + buffer_counter[current_player_receiving_trick + 1], 1);
                         if(bytes_received < 0){
-                            std::cerr << "Błąd podczas odczytywania wiadomości\n";
                             close(poll_descriptors[CONNECTION_SOCKET].fd);
                             disconnectAllPlayers(poll_descriptors);
                             return 1;
@@ -587,53 +546,66 @@ int Server::run(){
                             trick_sent[current_player_receiving_trick] = false;
                             disconnectPlayer(current_player_receiving_trick);
                             
-                        }else{ // dostałem bajt
+                        }else{ // got byte
                             char received_char = buffer[current_player_receiving_trick + 1][buffer_counter[current_player_receiving_trick + 1]];
                             buffer_counter[current_player_receiving_trick + 1] += 1;
                             if(received_char == '\n'){
-                                last_event_TRICK = -1;
                                 if(buffer_counter[current_player_receiving_trick + 1] > 1 && buffer[current_player_receiving_trick + 1][buffer_counter[current_player_receiving_trick + 1] - 2] == '\r'){
+                                    last_event_TRICK = -1; 
                                     std::string message(buffer[current_player_receiving_trick + 1], buffer_counter[current_player_receiving_trick + 1]);
                                     
+                                    raport(get_server_address(poll_descriptors[current_player_receiving_trick + 1].fd), get_local_address(poll_descriptors[current_player_receiving_trick + 1].fd), message);
                                     if(validateTRICK(message) == true){
+
+                                        int trick_number_from_message = calculateTrickNumFromTRICK(message); 
                                         
                                         std::string card = message.substr(6 + (current_trick >=10 ), message.length() - 8 - (current_trick >= 10));
-                                        if(checkIfPlayerCanPlayCard(card)){
+                                        if(checkIfPlayerCanPlayCard(card) && (trick_number_from_message == current_trick)){
 
                                             trick_sent[current_player_receiving_trick] = false;
                                             lined_cards += card;
                                             takeCardAwayFromPlayer(card);
                                             memset(buffer[current_player_receiving_trick + 1], 0, BUFFER_SIZE);
+                                            memset(buffer[current_player_receiving_trick + 6], 0, BUFFER_SIZE);
                                             buffer_counter[current_player_receiving_trick + 1] = 0;
+                                            buffer_counter[current_player_receiving_trick + 6] = 0;
                                             how_many_added_card += 1;
                                             current_player_receiving_trick = get_next_player();
 
-                                        // dostałem prawie dobry trick 
                                         }else{
-                                            std::cout << "prawie dobry trick\n";
-                                            send_message(poll_descriptors[current_player_receiving_trick + 6].fd, "WRONG" + std::to_string(current_trick) +"\r\n");
+
+                                            sending_wrong[current_player_receiving_trick] = true;
                                             trick_sent[current_player_receiving_trick] = false;
+                                            std::string wrong_message = "WRONG" + std::to_string(current_trick) + "\r\n";
+                                            strcpy(buffer[current_player_receiving_trick + 6], wrong_message.c_str());
+                                            buffer_counter[current_player_receiving_trick + 6] = wrong_message.length();
                                             memset(buffer[current_player_receiving_trick + 1], 0, BUFFER_SIZE);
                                             buffer_counter[current_player_receiving_trick + 1] = 0;
+                                            
                                         }
 
-                                    // dostałem shit
+
                                     }else{
-                                        // powinienem tutaj rozłączyć gracza
-                                        std::cout << "dostałem shit: " << message;
+
+                                        close(poll_descriptors[current_player_receiving_trick + 6].fd);
+                                        trick_sent[current_player_receiving_trick] = false;
+                                        memset(buffer[current_player_receiving_trick + 1], 0, BUFFER_SIZE);
+                                        memset(buffer[current_player_receiving_trick + 6], 0, BUFFER_SIZE);
+                                        buffer_counter[current_player_receiving_trick + 6] = 0;
+                                        buffer_counter[current_player_receiving_trick + 1] = 0;
+                                        disconnectPlayer(current_player_receiving_trick);
+
 
                                     }
                                         
                                 } // buffer_counter > 1 && buffer[buffer_counter - 2] == '\r'
                             }// received_char == '\n'
                         }
-                    }else{// nic nie przyszło od tego gracza
+                    }else{
 
-                            // jeśli został przekroczony timeout
-                        if(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - time_point_TRICK).count() > timeout){
+                        if(last_event_TRICK == 0 && std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - time_point_TRICK).count() > timeout){
                             trick_sent[current_player_receiving_trick] = false;
                             last_event_TRICK = -1;
-                            std::cout << "Timeout na Trick\n";
                         }
                     }
 
@@ -641,24 +613,57 @@ int Server::run(){
                 
             }
 
-            // wysyłam taken
+       
+            for(int i = 6; i < 10; i++){
+                
+                if(poll_descriptors[i].revents & POLLOUT && (sending_wrong[i-6] == true) && buffer_counter[i] > 0){
+
+                 
+                    ssize_t bytes_sent = send(poll_descriptors[i].fd, buffer[i], buffer_counter[i], 0);
+                    if(bytes_sent < 0){
+                        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                            perror("send would block, try again later");
+                        }else if(errno == EPIPE || errno == ECONNRESET){
+                            close(poll_descriptors[i].fd);
+                            poll_descriptors[i].fd = -1;
+                            poll_descriptors[i - 5].fd = -1;
+                            buffer_counter[i] = 0;
+                            memset(buffer[i], 0, BUFFER_SIZE);
+                            sending_wrong[i-6] = false;
+                        }else{
+                            disconnectAllPlayers(poll_descriptors);
+                            close(poll_descriptors[CONNECTION_SOCKET].fd);
+                            syserr("write");
+                        }
+                    }else{
+                        buffer_counter[i] -= bytes_sent;
+                        memmove(buffer[i], buffer[i] + bytes_sent, buffer_counter[i]);
+                    }
+                    if(buffer_counter[i] == 0){
+                        sending_wrong[i-6] = false;
+                        raport(get_local_address(poll_descriptors[i].fd), get_server_address(poll_descriptors[i].fd), "WRONG" + std::to_string(current_trick) + "\r\n");
+                    }
+
+                }
+
+            }
+
+         
             if(areAllPlayersConnected() && (how_many_added_card == 4 && player_receiving_deal == 4)){
 
                manageSendingTaken(poll_descriptors, buffer, buffer_counter);
                 
             }
 
-            // wysyłam score i total
+        
             if(areAllPlayersConnected() && current_trick == 14 && player_receiving_deal == 4){
 
                 manageSendingScoreAndTotal(poll_descriptors, buffer, buffer_counter);
             }
 
-        // jeśli mam coś do wysłania w waiting roomie
+     
         if( (messagesToSendFromWaitingRoom.size() > 0 || buffer_counter[PWRITE] > 0)){
-            std::cout << "coś do wysłania w waiting roomie\n";
-            // jeśli bufor wysyłania jest pusty
-            // umieszczam następną wiadomość do wysłania w buforze
+           
             if(buffer_counter[PWRITE] == 0){
                 if(messagesToSendFromWaitingRoom.size() > 0){
                     std::string message = messagesToSendFromWaitingRoom.front();
@@ -671,12 +676,12 @@ int Server::run(){
                 }
             }
             
-            // jeśli jest możliwość zapisu
+        
             if(poll_descriptors[PWRITE].revents & POLLOUT){
                 
-                // próbuje wysłać wiadomość
+              
                 ssize_t bytes_sent = send(poll_descriptors[PWRITE].fd, buffer[PWRITE], buffer_counter[PWRITE], 0);
-                // jeśli wystąpił błąd
+        
                 if(bytes_sent < 0){
                     if (errno == EAGAIN || errno == EWOULDBLOCK) {
                             perror("send would block, try again later");
@@ -689,25 +694,24 @@ int Server::run(){
                             syserr("write");
                         }
                 }else{
-                    // jeśli udało się wysłać niezerowe bajty
+                  
                     buffer_counter[PWRITE] -= bytes_sent;
                     memmove(buffer[PWRITE], buffer[PWRITE] + bytes_sent, buffer_counter[PWRITE]);
                 }
                 
-                // jeśli udało się wysłać wiadomość
+             
                 if(buffer_counter[PWRITE] == 0){
-                    // raportuje wysłanie wiadomości
+                
                     raport(get_local_address(poll_descriptors[PWRITE].fd), get_server_address(poll_descriptors[PWRITE].fd), message_to_raport_from_waiting_room);
-                    // podejmuje odpowiednie kroki
-                    // jeśli wysłałem już wszystkie wiadomości
+                 
                     if(messagesToSendFromWaitingRoom.size() == 0){
 
-                        // wysłałem busy
+                
                         if(assignFromWaitingRoom == 'B'){
 
                             close(poll_descriptors[PREAD].fd);
                             realiseWaitingRoom(poll_descriptors, buffer, buffer_counter);
-                        // przypisałem do jakiegoś miejsca
+            
                         }else{
                             assignClientToPlace(assignFromWaitingRoom, poll_descriptors);
                             realiseWaitingRoom(poll_descriptors, buffer, buffer_counter);
@@ -724,27 +728,29 @@ int Server::run(){
          
     }while(finish == false);
 
-    std::cout << "Koniec gry\n";
     close(poll_descriptors[CONNECTION_SOCKET].fd);
-    std::cout << "Zamknięto gniazdo\n";
     return 0;
+}
+void Server::sigpipe_handler(int signum) {
+    std::cerr << "Caught SIGPIPE signal: " << signum << std::endl;
+    
 }
 
 void Server::manageSendingScoreAndTotal(struct pollfd poll_descriptors[11], char buffer[11][BUFFER_SIZE], size_t buffer_counter[11]){
-    // przygotuj score i total
+  
                 std::string score_message = prepareScoreMessage();
                 std::string total_message = prepareTotalMessage();
                 std::string message = score_message + total_message;
 
 
-                // próbuje wysłać score i total do gracza
+              
                 if(buffer_counter[player_receiving_score_and_total + 6] == 0){
                     buffer_counter[player_receiving_score_and_total + 6] = message.length();
                     strcpy(buffer[player_receiving_score_and_total + 6], message.c_str());
                 }
 
-                // próbuje wysłać score i total do gracza
-                if(poll_descriptors[player_receiving_score_and_total + 6].revents & POLLOUT){ // jeśli jest możliwość zapisu
+            
+                if(poll_descriptors[player_receiving_score_and_total + 6].revents & POLLOUT){ 
                     ssize_t bytes_sent = send(poll_descriptors[player_receiving_score_and_total + 6].fd, buffer[player_receiving_score_and_total + 6], buffer_counter[player_receiving_score_and_total + 6], 0);
                     if(bytes_sent < 0){
                         if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -763,7 +769,7 @@ void Server::manageSendingScoreAndTotal(struct pollfd poll_descriptors[11], char
                         }
                     }else{
 
-                        // przesuwam bajty na początek bufora
+                
                         buffer_counter[player_receiving_score_and_total + 6] -= bytes_sent;
                         memmove(buffer[player_receiving_score_and_total + 6], buffer[player_receiving_score_and_total + 6] + bytes_sent, buffer_counter[player_receiving_score_and_total + 6]);
                         if(buffer_counter[player_receiving_score_and_total + 6] <= total_message.length() && score_sent == false){
@@ -771,21 +777,21 @@ void Server::manageSendingScoreAndTotal(struct pollfd poll_descriptors[11], char
                             score_sent = true;
                         }
                         if(buffer_counter[player_receiving_score_and_total + 6] == 0){
-                            // std::cout << "Rapotyuje total\n";
+                            
                             raport(get_local_address(poll_descriptors[player_receiving_score_and_total+6].fd), get_server_address(poll_descriptors[player_receiving_score_and_total+6].fd), total_message);
                             score_sent = false;
                         }
-                        // sleep(1);
+                        
                     }
                     
                 }
 
-                // udało się wysłać score i total do gracza
+             
                 if(buffer_counter[player_receiving_score_and_total + 6] == 0 && poll_descriptors[player_receiving_score_and_total + 6].fd != -1){
                     player_receiving_score_and_total += 1;
                 }
 
-                // jeśli wysłałem wszystkie score i total
+            
                 if(player_receiving_score_and_total == 4){
                     player_receiving_score_and_total = 0;
                     player_receiving_deal = -1;
@@ -794,7 +800,6 @@ void Server::manageSendingScoreAndTotal(struct pollfd poll_descriptors[11], char
                     reset_deals_sent();
                     current_deal_number += 1;
                     current_trick = 1;
-                    // zaznacz, że jest to czas na rozdanie
                     if(current_deal_number == number_of_deals_to_play){
                         finish = true;
                         disconnectAllPlayers(poll_descriptors);
@@ -803,24 +808,19 @@ void Server::manageSendingScoreAndTotal(struct pollfd poll_descriptors[11], char
                     }
                 }
 }
-
 void Server::manageSendingTaken(struct pollfd poll_descriptors[11], char buffer[11][BUFFER_SIZE], size_t buffer_counter[11]){
 
-    // próbuje wysłać taken do wszystkich zaczynając od pierwszego gracza
-                std::cout << "trick message to send: " << "TRICK" + std::to_string(current_trick) + lined_cards + "\r\n";
                 int who_takes_current_trick = whoTakeTrick(first_player_in_current_trick, "TRICK" + std::to_string(current_trick) + lined_cards + "\r\n");
-                std::cout << "who takes current trick: " << who_takes_current_trick << "\n";
-                    std::cout << "Kto bierze trick: " << getCharOfPlayer(who_takes_current_trick) << "\n";
-                    std::string message = "TAKEN" + std::to_string(current_trick) + lined_cards + getCharOfPlayer(who_takes_current_trick) + "\r\n";
+                std::string message = "TAKEN" + std::to_string(current_trick) + lined_cards + getCharOfPlayer(who_takes_current_trick) + "\r\n";
 
-                // jeśli w bufferze skierowanego do tego gracza nic nie ma
+               
                 if(buffer_counter[player_receiving_taken + 6] == 0){
                     buffer_counter[player_receiving_taken + 6] = message.length();
                     strcpy(buffer[player_receiving_taken + 6], message.c_str());
                 }
 
-                // próbuje wystawić taken do gracza
-                if(poll_descriptors[player_receiving_taken + 6].revents & POLLOUT){ // jeśli jest możliwość zapisu
+             
+                if(poll_descriptors[player_receiving_taken + 6].revents & POLLOUT){ 
                     ssize_t bytes_sent = send(poll_descriptors[player_receiving_taken + 6].fd, buffer[player_receiving_taken + 6], buffer_counter[player_receiving_taken + 6], 0);
                     if(bytes_sent < 0){
                         if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -838,7 +838,7 @@ void Server::manageSendingTaken(struct pollfd poll_descriptors[11], char buffer[
                             syserr("write");
                         }
                     }else{
-                        // przesuwam bajty na początek bufora
+                     
                         buffer_counter[player_receiving_taken + 6] -= bytes_sent;
                         memmove(buffer[player_receiving_taken + 6], buffer[player_receiving_taken + 6] + bytes_sent, buffer_counter[player_receiving_taken + 6]);
                         if(buffer_counter[player_receiving_taken + 6] == 0){
@@ -847,12 +847,12 @@ void Server::manageSendingTaken(struct pollfd poll_descriptors[11], char buffer[
                     }
                 }
 
-                // udało się wysłać taken do gracza
+            
                 if(buffer_counter[player_receiving_taken + 6] == 0 && poll_descriptors[player_receiving_taken + 6].fd != -1){
                     player_receiving_taken += 1;
                 }
                 
-                // po wysłaniu taken do wszystkich
+            
                 if(player_receiving_taken == 4){
                     int how_many_point_in_trick = pointsInTrick(lined_cards, current_deal.getType() - '0');
                     addPointsToPlayer(who_takes_current_trick, how_many_point_in_trick);
@@ -866,9 +866,8 @@ void Server::manageSendingTaken(struct pollfd poll_descriptors[11], char buffer[
                 }
 
 }
-
 void Server::manageDealCards(struct pollfd poll_descriptors[11], char buffer[11][BUFFER_SIZE], size_t buffer_counter[11]){
-    // jeśli w bufferze skierowanego do tego gracza nic nie ma
+    
                 if(buffer_counter[player_receiving_deal + 6] == 0){
 
                     std::string message = getProperDeal(getCharOfPlayer(player_receiving_deal));
@@ -877,10 +876,10 @@ void Server::manageDealCards(struct pollfd poll_descriptors[11], char buffer[11]
 
                 }
 
-                // próbuje wysłać deala do tego gracza
+              
                 if(poll_descriptors[player_receiving_deal + 6].revents & POLLOUT){ // jest możliwość zapisu
                     ssize_t bytes_sent = send(poll_descriptors[player_receiving_deal + 6].fd, buffer[player_receiving_deal + 6], buffer_counter[player_receiving_deal + 6], 0);
-                    // wystąpił błąd 
+               
                     if(bytes_sent < 0){
 
                         if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -900,17 +899,17 @@ void Server::manageDealCards(struct pollfd poll_descriptors[11], char buffer[11]
                             syserr("write");
                         }
                     
-                    // udało się wysłać niezerowe bajty
+                  
                         }else{
 
                             buffer_counter[player_receiving_deal + 6] -= bytes_sent;
                             memmove(buffer[player_receiving_deal + 6], buffer[player_receiving_deal + 6] + bytes_sent, buffer_counter[player_receiving_deal + 6]);
                         }
-                    // przesuwam bajty na początek bufora
+                
                 }
 
                 if(buffer_counter[player_receiving_deal + 6] == 0 && poll_descriptors[player_receiving_deal + 6].fd != -1){
-                    // muszę dodać karty
+                 
                     deals_sent[player_receiving_deal] = true;
                     raport(get_local_address(poll_descriptors[player_receiving_deal+6].fd), get_server_address(poll_descriptors[player_receiving_deal+6].fd), getProperDeal(getCharOfPlayer(player_receiving_deal)));   
                     cards_of_players[player_receiving_deal].addCardsFromCardsString(getDealCardsForPlayer(getCharOfPlayer(player_receiving_deal)));
@@ -922,19 +921,14 @@ void Server::manageDealCards(struct pollfd poll_descriptors[11], char buffer[11]
                     current_player_receiving_trick = getPlayerfromChar(current_deal.getFirstPlayer());
                 }
 }
-
 bool Server::checkIfPlayerCanPlayCard(const std::string& card){
-    // sprawdzam czy gracz ma taką kartę
     Card my_card = Card(Card::stringToCard(card));
-    // std::cout << "Karta gracza: " << my_card.toString() << "\n";
     if(checkIfPlayerHasCard(card) == false){
         return false;
     }
-    // std::cout << "czyli mam kartę\n";
     if(lined_cards == ""){
         return true;
     }
-    // std::cout << "lined cards: " << lined_cards << "\n";
     Card first_card = Card::stringToCard("2C");
 
     if(isdigit(lined_cards[1])){
@@ -942,40 +936,30 @@ bool Server::checkIfPlayerCanPlayCard(const std::string& card){
     }else{
         first_card = Card(Card::stringToCard(lined_cards.substr(0, 2)));
     }
-    std::cout << "Karta utworzona z lined cards: " << first_card.toString() << "\n";
 
     if(first_card.getColor() == my_card.getColor()){
         return true;
     }
 
-    // jeśli znajdę w śród jego kart kartę o kolorze pierwszej karty
     for(Card card : cards_of_players[current_player_receiving_trick].cards){
-        // std::cout << "Karta w ręku: " << card.toString() << "\n";
-        // std::cout << "Karta pierwsza: " << first_card.toString() << "\n";
         if(card.getColor() == first_card.getColor()){
             return false;
         }
     }
 
-    // nie 
     return true;
 }
-
 bool Server::checkIfPlayerHasCard(const std::string& card){
-    // sprawdzam czy gracz ma taką kartę
+   
     Card my_card = Card(Card::stringToCard(card));
-    // std::cout << "Moja karta: " << my_card.toString() << "\n";
     bool has_card = false;
-    // przeszukuję karty gracza
     for(Card card : cards_of_players[current_player_receiving_trick].cards){
-        // std::cout << "Karta w ręku: " << card.toString() << "\n";
         if(card.getColor() == my_card.getColor() && card.getRank() == my_card.getRank()){
             has_card = true;
         }
     }
     return has_card;
 }
-
 void Server::disconnectPlayer(int player){
     switch(player){
         case 0:
@@ -1038,7 +1022,7 @@ std::string getClientInfo(int client_fd) {
         return "";
     }
 
-    char ip_str[INET6_ADDRSTRLEN]; // Zapas na adres IPv6, który jest dłuższy
+    char ip_str[INET6_ADDRSTRLEN]; 
     int client_port;
 
     if (client_address.ss_family == AF_INET) { // IPv4
@@ -1050,9 +1034,9 @@ std::string getClientInfo(int client_fd) {
         client_port = ntohs(s->sin6_port);
         inet_ntop(AF_INET6, &s->sin6_addr, ip_str, sizeof(ip_str));
 
-        // Sprawdzenie, czy adres IPv6 jest w formacie mapped IPv4 address
+       
         if (IN6_IS_ADDR_V4MAPPED(&s->sin6_addr)) {
-            // Konwersja do IPv4
+            // Conversion to IPv4
             struct in_addr ipv4_addr;
             memcpy(&ipv4_addr, &s->sin6_addr.s6_addr[12], sizeof(ipv4_addr));
             inet_ntop(AF_INET, &ipv4_addr, ip_str, sizeof(ip_str));
@@ -1062,7 +1046,6 @@ std::string getClientInfo(int client_fd) {
         return "";
     }
 
-    // std::cout << "Połączono z klientem: " << ip_str << " na porcie: " << client_port << "\n";
     return std::string(ip_str) + ":" + std::to_string(client_port);
 }
 int Server::manConnectionSocket(int socket_fd, struct pollfd poll_descriptors[11]){
@@ -1073,7 +1056,6 @@ int Server::manConnectionSocket(int socket_fd, struct pollfd poll_descriptors[11
         std::cerr << "Błąd podczas akceptowania połączenia\n";
         return 1;
     }
-    std::cout << "Nowe połączenie\n";
     last_event_IAM = 0;
     time_point_IAM = std::chrono::steady_clock::now();
     poll_descriptors[PREAD].fd = waiting_room_fd;
@@ -1083,35 +1065,33 @@ int Server::manConnectionSocket(int socket_fd, struct pollfd poll_descriptors[11
 }
 int Server::manWaitingRoom(struct pollfd poll_descriptors[11], char buffer[11][BUFFER_SIZE], size_t buffer_counter[11]){
 
-    if(poll_descriptors[PREAD].revents & POLLIN){ // są dane do odczytu
+    if(poll_descriptors[PREAD].revents & POLLIN){ 
 
         ssize_t bytes_received = read(poll_descriptors[PREAD].fd, buffer[PREAD] + buffer_counter[PREAD], 1);
 
-        if(bytes_received < 0){ // błąd podczas odczytywania
+        if(bytes_received < 0){
             std::cerr << "Błąd podczas odczytywania wiadomości\n";
             close(poll_descriptors[CONNECTION_SOCKET].fd);
             disconnectAllPlayers(poll_descriptors);
             last_event_IAM = -1;
             realiseWaitingRoom(poll_descriptors, buffer, buffer_counter);
             return 1;
-        }else if(bytes_received == 0){ // client się rozłączył
+        }else if(bytes_received == 0){ 
 
             close(poll_descriptors[PREAD].fd);
             last_event_IAM = -1;
             realiseWaitingRoom(poll_descriptors, buffer, buffer_counter);
                     
-        }else{ // otrzymałem bajt
+        }else{ 
             char received_char = buffer[PREAD][buffer_counter[PREAD]];
             buffer_counter[PREAD] += 1;
             last_event_IAM = -1;
-            // std::cout << "Otrzymano bajt: " << received_char << "\n";
             
             if(received_char == '\n'){
                 if(buffer_counter[PREAD] > 1 && buffer[PREAD][buffer_counter[PREAD] - 2] == '\r'){
                     std::string message(buffer[PREAD], buffer_counter[PREAD]);
                     raport(get_server_address(poll_descriptors[PREAD].fd), getClientInfo(poll_descriptors[PREAD].fd), message);
                     responseToIAM(message, poll_descriptors, buffer, buffer_counter);
-                    std::cout << "Odpowiedź na IAM\n";
                 }
             }
 
@@ -1125,14 +1105,12 @@ int Server::manWaitingRoom(struct pollfd poll_descriptors[11], char buffer[11][B
             }
         }
                 
-    }else{ // sprawdzam, czy nie został przekroczony limit czasu na przesłanie IAM
+    }else{ 
         if(last_event_IAM == 0 && std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - time_point_IAM).count() > timeout){
-            // rozłączam się z takim klientem
+            
             close(poll_descriptors[PREAD].fd);
-            // czyszę poczekalnię
             last_event_IAM = -1;
             realiseWaitingRoom(poll_descriptors, buffer, buffer_counter);
-            std::cout << "Timeout na IAM\n";
         }
     }
     return 0;
@@ -1181,18 +1159,7 @@ void Server::addPointsToPlayer(int player, int points){
     pointsInDeal[player] += points;
     pointsInTotal[player] += points;
 }
-void Server::wypisz_punkty(){
-    std::cout << "Punkty w rozdaniu: ";
-    for(int i = 0; i < 4; i++){
-        std::cout << pointsInDeal[i] << " ";
-    }
-    std::cout << "\n";
-    std::cout << "Punkty w sumie: ";
-    for(int i = 0; i < 4; i++){
-        std::cout << pointsInTotal[i] << " ";
-    }
-    std::cout << "\n";
-}
+
 void Server::zeroPointsInDeal(){
     for(int i = 0; i < 4; i++){
         pointsInDeal[i] = 0;

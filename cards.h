@@ -26,8 +26,11 @@ class Card{
         static Card stringToCard(const std::string& card);
         // return string representation of the card
         std::string toString() const;
+        // return vector of cards from string
         static std::vector<std::string> extractCardsVectorFromCardsStringStr(const std::string& hand);
+        // return true if the string is valid card
         static bool isStringValidCard(const std::string& card);
+        // return vector of cards from string
         static std::vector<Card> extractCardsVectorFromCardsString(const std::string& hand);
 
     private:
@@ -39,31 +42,31 @@ class CardSet{
     public:
         CardSet(bool fullDeck = false);
         ~CardSet();
-        // return list representation of the cards on hand
-        std::string getCardsOnHand();
         // return card of the given color or first card if color is not given
         // if there is no card of the given color, return first card
         Card getCardOfColor(char color = '0');
+        // return list representation of the cards on hand
+        std::string getCardsOnHand();
+        // add to the set cards from the string
+        void addCardsFromCardsString(const std::string& cards);
+        // remove card from the set
+        void removeCard(Card card);
         // return true if the card is in the set
         // return false otherwise
         bool isCardInSet(const Card& card) const;
-        //add card to the set
-        void addCard(Card card);
-        // remove card from the set
-        void removeCard(Card card);
-        // add to the set cards from the string
-        void addCardsFromCardsString(const std::string& cards);
+
         std::vector<Card> cards;
     private:
+        //add card to the set
+        void addCard(Card card);
         // initialize full deck of cards
         void initializeFullDeck();
 };
 
-// klasa rozdania, definiowana poprzez elementy pliku
+// class representing a deal
 class Deal{
     public:
         Deal(char type, char firstPlayer, const std::string& dealN, const std::string& dealE, const std::string& dealS, const std::string& dealW);
-        // Deal(const Deal& other);
         Deal();
         ~Deal();
 
@@ -73,26 +76,27 @@ class Deal{
         std::string dealE;
         std::string dealS;
         std::string dealW;
+        // return type of the deal
         char getType();
+        // return first player of the deal
         char getFirstPlayer();
     private:
 };
 
-// klasa rozgrywki, definiowana
-// poprzez plik
+// class representing a gameplay
 class Gameplay{
-    // konstruktor i destruktor rozgrywki
     public:
         Gameplay(const std::string& filename);
         ~Gameplay();
-        // zwraca rozdanie o wskazanym numerze
+        // return deal of the given number
         Deal getDeal(int dealNumber);
+        // return number of deals
         int getNumberOfDeals();
 
     private:
-        // nazwa pliku, na podstawie, którego będzie tworzona rozgrywka
         std::string filename;
         std::vector<Deal> dealsToPlay;
+        // create deals from file
         void createDealsFromFile();
 
 };

@@ -88,21 +88,19 @@ std::vector<std::string> Card::extractCardsVectorFromCardsStringStr(const std::s
     while (i < hand_length) {
         std::string card;
 
-        // Sprawdzenie, czy karta to "10" + kolor (3 znaki)
         if (i + 2 < hand_length && hand.substr(i, 2) == "10") {
-            card = hand.substr(i, 3); // Wyodrębnij "10X"
+            card = hand.substr(i, 3); // card "10X"
             i += 3;
         } else {
-            // Każda inna karta to jeden znak liczbowy + jeden znak koloru (2 znaki)
-            card = hand.substr(i, 2); // Wyodrębnij "VX"
+         
+            card = hand.substr(i, 2); // card "VX"
             i += 2;
         }
 
-        // Dodaj kartę do wektora
         cards.push_back(card);
     }
 
-    return cards; // Zwróć wektor kart
+    return cards; 
 }
 bool Card::isStringValidCard(const std::string& card){
     static const std::regex card_regex("^(10|[2-9]|[JQKA])[CDHS]$");
@@ -119,12 +117,12 @@ std::vector<Card> Card::extractCardsVectorFromCardsString(const std::string& han
         char color;
 
         if (i + 2 < hand_length && hand.substr(i, 2) == "10") {
-            rank_str = "10"; // Ranga to "10"
-            color = hand[i + 2]; // Kolor jest na pozycji 3 (indeks i + 2)
+            rank_str = "10"; // Rank "10"
+            color = hand[i + 2]; 
             i += 3;
         } else if (i + 1 < hand_length) {
-            rank_str = hand.substr(i, 1); // Ranga to jeden znak (2-9, J, Q, K, A)
-            color = hand[i + 1]; // Kolor jest na pozycji 2 (indeks i + 1)
+            rank_str = hand.substr(i, 1); // Rank (2-9, J, Q, K, A)
+            color = hand[i + 1];
             i += 2;
         } else {
             throw std::invalid_argument("Niekompletna karta w stringu");
@@ -204,10 +202,7 @@ Gameplay::Gameplay(const std::string& filename) : filename(filename), dealsToPla
 Gameplay::~Gameplay(){
 }
 
-// funkcja, która tworzy rozgrywkę na podstawie pliku
-// wczytuje odpowiednie rozdania
 void Gameplay::createDealsFromFile(){
-    std::cout << "Creating deals from file: " << filename << std::endl;
     std::ifstream file(filename);
     std::string line;
 
@@ -230,14 +225,8 @@ void Gameplay::createDealsFromFile(){
 }
 
 Deal::Deal() : type(' '), firstPlayer(' '), dealN(""), dealE(""), dealS(""), dealW("") {
-        std::cout << "Default constructor called" << std::endl;
         }
 Deal::Deal(char type, char firstPlayer, const std::string& dealN, const std::string& dealE, const std::string& dealS, const std::string& dealW) : type(type), firstPlayer(firstPlayer), dealN(dealN), dealE(dealE), dealS(dealS), dealW(dealW) {
-    std::cout << "Creating deal of type: " << type << " with first player: " << firstPlayer << std::endl;
-    std::cout << "Deal for N: " << dealN << std::endl;
-    std::cout << "Deal for E: " << dealE << std::endl;
-    std::cout << "Deal for S: " << dealS << std::endl;
-    std::cout << "Deal for W: " << dealW << std::endl;
 }
 Deal::~Deal(){
 }

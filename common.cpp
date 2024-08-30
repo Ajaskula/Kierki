@@ -52,7 +52,6 @@ std::string get_server_address(int socket_fd) {
     struct sockaddr_storage addr;
     socklen_t addr_len = sizeof(addr);
 
-    // Pobieranie adresu serwera
     if (getpeername(socket_fd, (struct sockaddr*)&addr, &addr_len) != 0) {
         perror("getpeername failed");
         return "";
@@ -61,30 +60,26 @@ std::string get_server_address(int socket_fd) {
     char ip_str[INET6_ADDRSTRLEN];
     std::string server_address;
 
-    // Obsługa IPv4
+    // IPv4
     if (addr.ss_family == AF_INET) {
         struct sockaddr_in* s = (struct sockaddr_in*)&addr;
         inet_ntop(AF_INET, &s->sin_addr, ip_str, sizeof(ip_str));
         server_address = ip_str;
     } 
-    // Obsługa IPv6
+    // IPv6
     else if (addr.ss_family == AF_INET6) {
         struct sockaddr_in6* s = (struct sockaddr_in6*)&addr;
-        // Sprawdzanie, czy adres IPv6 jest mapowanym adresem IPv4
         if (IN6_IS_ADDR_V4MAPPED(&s->sin6_addr)) {
             struct in_addr ipv4_addr;
-            // Wyciąganie adresu IPv4 z mapowanego adresu IPv6
             memcpy(&ipv4_addr, &s->sin6_addr.s6_addr[12], sizeof(ipv4_addr));
             inet_ntop(AF_INET, &ipv4_addr, ip_str, sizeof(ip_str));
             server_address = ip_str;
         } else {
-            // W przypadku, gdy adres IPv6 nie jest mapowanym adresem IPv4
             inet_ntop(AF_INET6, &s->sin6_addr, ip_str, sizeof(ip_str));
             server_address = ip_str;
         }
     }
 
-    // Dodawanie numeru portu do końca adresu
     server_address += ":" + std::to_string(ntohs(((addr.ss_family == AF_INET) ? 
         ((struct sockaddr_in*)&addr)->sin_port : 
         ((struct sockaddr_in6*)&addr)->sin6_port)));
@@ -95,7 +90,6 @@ std::string get_local_address(int socket_fd) {
     struct sockaddr_storage addr;
     socklen_t addr_len = sizeof(addr);
 
-    // Pobieranie lokalnego adresu
     if (getsockname(socket_fd, (struct sockaddr*)&addr, &addr_len) != 0) {
         perror("getsockname failed");
         return "";
@@ -113,21 +107,18 @@ std::string get_local_address(int socket_fd) {
     // Obsługa IPv6
     else if (addr.ss_family == AF_INET6) {
         struct sockaddr_in6* s = (struct sockaddr_in6*)&addr;
-        // Sprawdzanie, czy adres IPv6 jest mapowanym adresem IPv4
         if (IN6_IS_ADDR_V4MAPPED(&s->sin6_addr)) {
             struct in_addr ipv4_addr;
-            // Wyciąganie adresu IPv4 z mapowanego adresu IPv6
             memcpy(&ipv4_addr, &s->sin6_addr.s6_addr[12], sizeof(ipv4_addr));
             inet_ntop(AF_INET, &ipv4_addr, ip_str, sizeof(ip_str));
             local_address = ip_str;
         } else {
-            // W przypadku, gdy adres IPv6 nie jest mapowanym adresem IPv4
+      
             inet_ntop(AF_INET6, &s->sin6_addr, ip_str, sizeof(ip_str));
             local_address = ip_str;
         }
     }
 
-    // Dodawanie numeru portu do końca adresu
     local_address += ":" + std::to_string(ntohs(((addr.ss_family == AF_INET) ? 
         ((struct sockaddr_in*)&addr)->sin_port : 
         ((struct sockaddr_in6*)&addr)->sin6_port)));
@@ -185,7 +176,6 @@ std::string get_busy_places_from_BUSY(const std::string& message){
     std::string busy_places;;
     for(std::string::size_type i = 4; i < message.length() - 2; i++){
         busy_places += message[i];
-        // pod warunkiem, że nie jest to ostatni znak
         if(i != message.length() - 3){
             busy_places += ", ";
         }
@@ -193,10 +183,7 @@ std::string get_busy_places_from_BUSY(const std::string& message){
     return busy_places;
 }
 std::string convert_total_message(const std::string& message) {
-    // Tworzymy wynikowy strumień tekstowy
-    // std::cout << "wiadomość, która przyszła do convert_score_message: " << message << std::endl;
 
-    // Usuwamy prefiks "SCORE" oraz suffix "\r\n"
     std::string input = message.substr(5, message.length() - 7);
     std::vector<int> numbers;
     std::vector<char> directions;
@@ -206,13 +193,13 @@ std::string convert_total_message(const std::string& message) {
             number_str += input[i];  // Zbieranie cyfr do liczby
         } else if (input[i] == 'N' || input[i] == 'E' || input[i] == 'W' || input[i] == 'S') {
             if (!number_str.empty()) {
-                numbers.push_back(std::stoi(number_str));  // Konwersja zebranego ciągu cyfr na liczbę i dodanie do wektora
-                number_str.clear();  // Wyczyść number_str dla kolejnej liczby
+                numbers.push_back(std::stoi(number_str));  
+                number_str.clear();  
             }
-            directions.push_back(input[i]);  // Dodanie znaku kierunku do wektora
+            directions.push_back(input[i]);  
         }
     }
-    // Dodanie ostatniej liczby do wektora, jeśli jakaś pozostała
+
     if (!number_str.empty()) {
         numbers.push_back(std::stoi(number_str));
     }
@@ -228,14 +215,12 @@ std::string convert_total_message(const std::string& message) {
     return result.str();
 }
 std::string extract_card_list_from_taken(const std::string& message) {
-    // Regularne wyrażenie do dopasowania komunikatu TAKEN, uwzględniając \r\n na końcu
+
     std::regex pattern(R"(TAKEN\d+((?:10|[2-9]|[JQKA])[HDCS]+)([NEWS])\r\n$)");
     std::smatch matches;
-    std::cout << "FIXME: w extract_card_list message to " << message << std::endl;
-    std::cout << "FIXME: length of message is " << message.length() << std::endl;
     if (std::regex_search(message, matches, pattern)) {
-        std::string card_list = matches[1].str(); // Wyciągamy listę kart
-        std::cout << "FIXME: w extract_card_list" << card_list << std::endl;
+        std::string card_list = matches[1].str(); 
+
         std::string formatted_list;
         card_list = "AS2H3D4C5S6H7D8C9S10HJSQDKC";
         // Przetwarzanie kart i formatowanie listy
@@ -244,37 +229,34 @@ std::string extract_card_list_from_taken(const std::string& message) {
                 formatted_list += ", ";
             }
             formatted_list += card_list.substr(i, (card_list[i] == '1') ? 3 : 2);
-            i += (card_list[i] == '1'); // Jeśli karta to "10", zwiększamy indeks o 1 więcej
+            i += (card_list[i] == '1'); 
         }
 
         return formatted_list;
     }
 
-    return ""; // Zwracamy pusty string, jeśli komunikat nie pasuje do wzorca
+    return ""; 
 }
 
 
 std::string convert_score_message(const std::string& message) {
-    // Tworzymy wynikowy strumień tekstowy
-    std::cout << "wiadomość, która przyszła do convert_score_message: " << message << std::endl;
-
-    // Usuwamy prefiks "SCORE" oraz suffix "\r\n"
+  
     std::string input = message.substr(5, message.length() - 7);
     std::vector<int> numbers;
     std::vector<char> directions;
     std::string number_str;
     for (size_t i = 0; i < input.length(); ++i) {
         if (std::isdigit(input[i])) {
-            number_str += input[i];  // Zbieranie cyfr do liczby
+            number_str += input[i]; 
         } else if (input[i] == 'N' || input[i] == 'E' || input[i] == 'W' || input[i] == 'S') {
             if (!number_str.empty()) {
-                numbers.push_back(std::stoi(number_str));  // Konwersja zebranego ciągu cyfr na liczbę i dodanie do wektora
-                number_str.clear();  // Wyczyść number_str dla kolejnej liczby
+                numbers.push_back(std::stoi(number_str)); 
+                number_str.clear();  
             }
-            directions.push_back(input[i]);  // Dodanie znaku kierunku do wektora
+            directions.push_back(input[i]); 
         }
     }
-    // Dodanie ostatniej liczby do wektora, jeśli jakaś pozostała
+   
     if (!number_str.empty()) {
         numbers.push_back(std::stoi(number_str));
     }
@@ -290,15 +272,15 @@ std::string convert_score_message(const std::string& message) {
     return result.str();
 }
 std::vector<std::string> extract_card_vector_from_taken(const std::string& message) {
-    // Regularne wyrażenie do dopasowania komunikatu TAKEN
+
     std::regex pattern(R"(TAKEN\d+((?:10|[2-9]|[JQKA])[HDCS]+)([NEWS])$)");
     std::smatch matches;
     std::vector<std::string> card_vector;
 
     if (std::regex_search(message, matches, pattern)) {
-        std::string card_list = matches[1].str(); // Wyciągamy listę kart
+        std::string card_list = matches[1].str(); 
 
-        // Przetwarzanie kart i dodawanie ich do wektora
+    
         for (size_t i = 0; i < card_list.length(); i += 2) {
             std::string card = card_list.substr(i, (card_list[i] == '1') ? 3 : 2);
             card_vector.push_back(card);
@@ -309,18 +291,18 @@ std::vector<std::string> extract_card_vector_from_taken(const std::string& messa
     return card_vector;
 }
 char get_first_card_color_from_TRICK(const std::string& message) {
-    // Zaktualizowane wyrażenie regularne, aby wyodrębnić kolor pierwszej karty
+   
     std::regex pattern(R"(TRICK\d+(?:\d{1,2}|[JQKA])([CSDH]).*\r\n)");
     std::smatch matches;
 
     if (std::regex_search(message, matches, pattern)) {
-        return matches[1].str()[0]; // matches[1] to kolor pierwszej karty
+        return matches[1].str()[0]; 
     }
 
-    return '0'; // Zwraca '0', jeśli nie znaleziono dopasowania
+    return '0'; 
 }
 std::string convert_taken_message(const std::string& taken_message) {
-    // Ignorujemy końcowe \r\n, usuwamy "TAKEN"
+   
     std::string clean_message = taken_message.substr(5, taken_message.length() - 7);
 
     char player_position = clean_message.back(); 
